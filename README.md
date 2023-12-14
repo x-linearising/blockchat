@@ -1,2 +1,2 @@
-# blockchat
-BlockChat - Semester project for Distributed Systems course
+# BlockChat
+Semester project for Distributed Systems course
