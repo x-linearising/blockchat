@@ -24,7 +24,7 @@ class Wallet:
         return signature
 
     def verify(self, signature, msg):
-        """ signature msg should be a bytes objects """
+        """ signature, msg should be bytes objects """
         try:
             self._key_obj.public_key().verify(
                 signature,
