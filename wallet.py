@@ -9,7 +9,11 @@ class Wallet:
         self._key_obj = rsa.generate_private_key(public_exponent=65537, key_size=2048)
 
     def public_key(self):
-        return self._key_obj.public_key().public_bytes(Encoding.OpenSSH, PublicFormat.OpenSSH)
+        return self \
+            ._key_obj \
+            .public_key() \
+            .public_bytes(Encoding.OpenSSH, PublicFormat.OpenSSH) \
+            .decode()
 
     def sign(self, msg):
         """ msg should be a bytes object """
