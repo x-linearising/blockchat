@@ -7,12 +7,13 @@ class Wallet:
 
     def __init__(self):
         self._key_obj = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        self.public_key = self \
+            ._key_obj \
+            .public_key() \
+            .public_bytes(Encoding.PEM, PublicFormat.SubjectPublicKeyInfo) \
+            .decode()
 
-    def public_key(self):
-        return self._key_obj.public_key().public_bytes(Encoding.OpenSSH, PublicFormat.OpenSSH)
-
-    def sign(self, msg):
-        """ msg should be a bytes object """
+    def sign(self, msg: bytes) -> bytes:
         signature = self._key_obj.sign(
             msg,
             padding.PSS(
@@ -23,8 +24,7 @@ class Wallet:
         )
         return signature
 
-    def verify(self, signature, msg):
-        """ signature, msg should be bytes objects """
+    def verify(self, signature: bytes, msg: bytes) -> bool:
         try:
             self._key_obj.public_key().verify(
                 signature,
