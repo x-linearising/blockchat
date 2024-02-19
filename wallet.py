@@ -13,8 +13,7 @@ class Wallet:
             .public_bytes(Encoding.PEM, PublicFormat.SubjectPublicKeyInfo) \
             .decode()
 
-    def sign(self, msg):
-        """ msg should be a bytes object """
+    def sign(self, msg: bytes) -> bytes:
         signature = self._key_obj.sign(
             msg,
             padding.PSS(
@@ -25,8 +24,7 @@ class Wallet:
         )
         return signature
 
-    def verify(self, signature, msg):
-        """ signature, msg should be bytes objects """
+    def verify(self, signature: bytes, msg: bytes) -> bool:
         try:
             self._key_obj.public_key().verify(
                 signature,

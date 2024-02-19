@@ -8,8 +8,7 @@ from cryptography.hazmat.primitives.serialization import load_pem_public_key
 
 import wallet
 
-def sha256hash(data):
-    """ data must be a bytes object """
+def sha256hash(data: bytes) -> bytes:
     digest = hashes.Hash(hashes.SHA256())
     digest.update(data)
     return digest.finalize()
@@ -22,7 +21,7 @@ class TransactionBuilder:
         self.nonce = 0
         self.sender_addr = self.wallet.public_key
 
-    def create(self, recv_addr, trans_type, payload):
+    def create(self, recv_addr: str, trans_type: str, payload):
         """
         if trans_type == "m", payload must be a string message
         if trans_type == "a", payload must be a float amount 
@@ -59,7 +58,7 @@ class TransactionBuilder:
         return json.dumps(tx)
 
 
-def verify_tx(tx):
+def verify_tx(tx: str) -> bool:
     tx = json.loads(tx)
     tx_bytes = struct.pack("!" + str(len(tx["contents"])) + "s", bytes(tx["contents"], "ascii"))
     my_hash = sha256hash(tx_bytes)
