@@ -1,8 +1,19 @@
 import json
 import struct
 from base64 import b64encode, b64decode
+from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.asymmetric import padding
+from cryptography.hazmat.primitives.serialization import load_pem_public_key
+
 import wallet
+
+def sha256hash(data):
+    """ data must be a bytes object """
+    digest = hashes.Hash(hashes.SHA256())
+    digest.update(data)
+    return digest.finalize()
+
 
 class TransactionBuilder:
 
@@ -34,9 +45,7 @@ class TransactionBuilder:
         tx_str = json.dumps(tx_contents)
         tx_bytes = struct.pack("!" + str(len(tx_str)) + "s", bytes(tx_str, "ascii"))
 
-        digest = hashes.Hash(hashes.SHA256())
-        digest.update(tx_bytes)
-        tx_hash = digest.finalize()
+        tx_hash = sha256hash(tx_bytes)
         tx_sign = self.wallet.sign(tx_bytes)
 
         tx = {
@@ -49,7 +58,41 @@ class TransactionBuilder:
 
         return json.dumps(tx)
 
+
+def verify_tx(tx):
+    tx = json.loads(tx)
+    tx_bytes = struct.pack("!" + str(len(tx["contents"])) + "s", bytes(tx["contents"], "ascii"))
+    my_hash = sha256hash(tx_bytes)
+    tx["hash"] = b64decode(tx["hash"])
+
+    if tx["hash"] != my_hash:
+        print("Hash mismatch detected!")
+        return False
+
+    tx["contents"] = json.loads(tx["contents"])
+    sender_pubkey = load_pem_public_key(bytes(tx["contents"]["sender_addr"], "ascii"))
+    sign = b64decode(tx["sign"])
+
+    try:
+        sender_pubkey.verify(
+            sign,
+            tx_bytes,
+            padding.PSS(
+                mgf=padding.MGF1(hashes.SHA256()),
+                salt_length=padding.PSS.MAX_LENGTH
+            ),
+            hashes.SHA256()
+        )
+        return True
+    except InvalidSignature: 
+        print("Invalid signature detected!")
+        return False
+
+
 if __name__ == "__main__":
     w = wallet.Wallet()
     t = TransactionBuilder(w)
     tx = t.create("some_addr", "a", 1337)
+    res = verify_tx(tx)
+    if res:
+        print("Tx was verified!")
