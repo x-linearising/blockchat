@@ -4,7 +4,7 @@ class JSONSerializable:
         This is useful in endpoints as Flask needs a dictionary like structure
         for its responses and requests.
     """
-    def to_json(self):
+    def to_dict(self):
         if hasattr(self, '__dict__'):
             return self.__dict__
         else:

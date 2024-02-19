@@ -32,7 +32,7 @@ class Node:
         # Set the headers with the appropriate Content-Type
         headers = {'Content-Type': 'application/json'}
 
-        raw_response = requests.post(Constants.get_bootstrap_node_url() + "/nodes", json=request.to_json(),
+        raw_response = requests.post(Constants.get_bootstrap_node_url() + "/nodes", json=request.to_dict(),
                                      headers=headers)
         response = JoinResponse.from_json(raw_response.json())
 

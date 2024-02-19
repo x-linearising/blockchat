@@ -3,7 +3,7 @@ import logging
 from flask import Flask
 from flask_restful import Api
 
-from controller.nodes_controller import NodesController
+from controllers.nodes_controller import NodesController
 from node_memory import NodeMemory
 
 app = Flask(__name__)

@@ -24,7 +24,7 @@ class NodesController:
     def add_node():
         # Mapping request body to class
         join_request = JoinRequest.from_json(request.json)
-        logging.info(f"Received request to add the following node to the network: {join_request.to_json()}.")
+        logging.info(f"Received request to add the following node to the network: {join_request.to_dict()}.")
 
         # Performing validations
         NodesController.perform_validations_for_post(join_request)
@@ -44,7 +44,7 @@ class NodesController:
         # Creating response
         response = JoinResponse(id_of_new_node)
 
-        return response.to_json()
+        return response.to_dict()
 
     @staticmethod
     def perform_validations_for_post(join_request: JoinRequest):
