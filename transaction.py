@@ -20,7 +20,7 @@ class TransactionBuilder:
     def __init__(self, wallet):
         self.wallet = wallet
         self.nonce = 0
-        self.sender_addr = self.wallet.public_key()
+        self.sender_addr = self.wallet.public_key
 
     def create(self, recv_addr, trans_type, payload):
         """

@@ -7,9 +7,7 @@ class Wallet:
 
     def __init__(self):
         self._key_obj = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-
-    def public_key(self):
-        return self \
+        self.public_key = self \
             ._key_obj \
             .public_key() \
             .public_bytes(Encoding.PEM, PublicFormat.SubjectPublicKeyInfo) \
