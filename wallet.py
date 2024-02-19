@@ -12,8 +12,7 @@ class Wallet:
         return self \
             ._key_obj \
             .public_key() \
-            .public_bytes(Encoding.OpenSSH, PublicFormat.OpenSSH) \
-            .decode()
+            .public_bytes(Encoding.PEM, PublicFormat.SubjectPublicKeyInfo)
 
     def sign(self, msg):
         """ msg should be a bytes object """
