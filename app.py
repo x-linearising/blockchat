@@ -3,9 +3,8 @@ import logging
 from flask import Flask
 from flask_restful import Api
 
-from controllers.nodes_controller import BootstrapController
+from controllers.bootstrap_controller import BootstrapController
 from node import Node, Bootstrap
-from node_memory import NodeMemory
 from constants import Constants
 
 is_bootstrap_str = input("Start node as bootstrap node? (y/n): ").lower()
