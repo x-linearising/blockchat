@@ -6,16 +6,12 @@ from response_classes.join_response import JoinResponse
 from wallet import Wallet
 from transaction import TransactionBuilder
 
-class NodeInfo:
-    def __init__(self, ip_address, port, node_id = None):
+class Node():
+    def __init__(self, ip_address, port, node_id=None):
         self.id = node_id
         self.ip_address = ip_address
         self.port = port
         self.other_nodes = {}
-
-class Node(NodeInfo):
-    def __init__(self, ip_address, port, node_id = None):
-        super().__init__(ip_address, port, node_id)
         self.wallet = Wallet()
         self.public_key = self.wallet.public_key
         self.tx_builder = TransactionBuilder(self.wallet)
