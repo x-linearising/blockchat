@@ -3,21 +3,19 @@ import logging
 import requests
 
 from constants import Constants
-from helper import JSONSerializable
 from request_classes.join_request import JoinRequest
-from response_classes.join_response import JoinResponse
 from wallet import Wallet
 from transaction import TransactionBuilder
 
 
-class NodeInfo(JSONSerializable):
+class NodeInfo:
     def __init__(self, ip_address, port, public_key=None):
         self.ip_address = ip_address
         self.port = port
         self.public_key = public_key
 
     def get_node_url(self):
-        url = f"{self.ip_address}:{self.port}"
+        url = f"http://{self.ip_address}:{self.port}"
         return url
 
 
@@ -41,17 +39,22 @@ class Node(NodeInfo):
         logging.info("Sending request to Boostrap Node to join the network.")
 
         # Make request to boostrap node
-        request = JoinRequest(self.public_key, self.ip_address, self.port)
+        join_request = {
+            "public_key": self.public_key,
+            "ip_address": self.ip_address,
+            "port": self.port
+        }
 
-        raw_response = requests.post(Constants.get_bootstrap_node_url() + "/nodes",
-                                     json=request.to_dict(),
-                                     headers=Constants.JSON_HEADER)
-        response = JoinResponse.from_json(raw_response.json())
+        join_response = requests.post(Constants.get_bootstrap_node_url() + "/nodes",
+                                      json=join_request,
+                                      headers=Constants.JSON_HEADER)
 
-        # Assign returned id to node
-        self.id = response.id
-
-        logging.info(f"Joined the network successfully with id {self.id}.")
+        if join_response.ok:
+            self.id = join_response.json().get("id")
+            logging.info(f"Joined the network successfully with id {self.id}. Waiting for bootstrap phase completion.")
+        else:
+            logging.error(f"""Could not join the network. Bootstrap node responded 
+                          with status [{join_response.status_code}] and message [{join_response.text}].""")
 
 
     def create_tx(self, recv, type, payload):

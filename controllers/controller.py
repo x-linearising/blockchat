@@ -43,7 +43,7 @@ class NodeController:
 class BootstrapController(NodeController):
 
     def __init__(self):
-        self.bootstrap = Bootstrap()
+        self.node = Bootstrap()
         self.blueprint = Blueprint("nodes", __name__)
         self.nodes_counter = 1
         self.is_bootstrapping_phase_over = False
@@ -66,7 +66,7 @@ class BootstrapController(NodeController):
         self.validate_join_request(join_request)
 
         # Adding node
-        self.bootstrap.add_node(join_request, self.nodes_counter)
+        self.node.add_node(join_request, self.nodes_counter)
         logging.info(f"Node with id {self.nodes_counter} has been added to the network.")
 
         # Creating response
@@ -88,21 +88,21 @@ class BootstrapController(NodeController):
             logging.warning(log_message)
             abort(400, description=log_message)
 
-        if self.bootstrap.node_has_joined(join_request.ip_address, join_request.port):
+        if self.node.node_has_joined(join_request.ip_address, join_request.port):
             log_message = "Bad request: Node with given ip and port has already been added."
             logging.warning(log_message)
             abort(400, description=log_message)
 
     def broadcast_node_list(self):
         # Adds itself to the list
-        complete_list = self.bootstrap.other_nodes.copy()
-        complete_list[self.bootstrap.id] = NodeInfo(self.bootstrap.ip_address,
-                                                    self.bootstrap.port,
-                                                    self.bootstrap.public_key)
+        complete_list = self.node.other_nodes.copy()
+        complete_list[self.node.id] = NodeInfo(self.node.ip_address,
+                                               self.node.port,
+                                               self.node.public_key)
 
         # Send list to each node
         node_list_request = NodeListRequest.from_node_info_dict_to_request(complete_list)
-        for node_id, node in self.bootstrap.other_nodes.items():
+        for node_id, node in self.node.other_nodes.items():
             response = requests.post(node.get_node_url() + "/nodes",
                                      json=node_list_request,
                                      headers=Constants.JSON_HEADER)
