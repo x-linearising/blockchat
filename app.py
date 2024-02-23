@@ -3,18 +3,17 @@ import logging
 from flask import Flask
 from flask_restful import Api
 
-from controllers.bootstrap_controller import BootstrapController
-from node import Node, Bootstrap
+from controllers.controller import BootstrapController, NodeController
 from constants import Constants
+
+app = Flask(__name__)
+api = Api(app)
+logging.basicConfig(level=logging.INFO)
 
 is_bootstrap_str = input("Start node as bootstrap node? (y/n): ").lower()
 is_bootstrap = is_bootstrap_str == 'y'
 
 if is_bootstrap:
-    app = Flask(__name__)
-    api = Api(app)
-    logging.basicConfig(level=logging.INFO)
-
     # Set up node, basically its memory.
     bootstrap = BootstrapController()
 
@@ -37,8 +36,14 @@ if is_bootstrap:
 else:
     ip_address = "http://localhost"  # TODO: Replace this maybe. Find it automatically?
     port = int(input("Enter port number: "))
-    node = Node(ip_address, port)
-    node.request_to_join_network_and_get_assigned_id()
+
+    # Set up node, basically its memory.
+    node_controller = NodeController(ip_address, port)
+
+    # Add routes / endpoints.
+    app.register_blueprint(node_controller.blueprint, url_prefix='/nodes')
+
+    app.run(port=port)
     # TODO: parse reply and do node.id = reply.id
     # TODO: node also listens on endpoints
     # (maybe split the files to bootstrap_app and node_app for this)
