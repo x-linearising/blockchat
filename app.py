@@ -1,11 +1,18 @@
 import logging
 import argparse
+from threading import Thread
 from flask import Flask
 from flask_restful import Api
 from controllers.bootstrap_controller import BootstrapController
 from node import Node, Bootstrap
 from constants import Constants
 from helper import myIP
+
+def user_interface(node, prompt_str=">>> "):
+    while True:
+        print(f"[Node {node.id}] Enter your command:")
+        line = input(prompt_str)
+        node.execute_cmd(line)    
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-b", "--bootstrap", action = argparse.BooleanOptionalAction, default = False)
@@ -35,20 +42,18 @@ if is_bootstrap:
 
     # Add routes / endpoints.
     app.register_blueprint(bootstrap.blueprint, url_prefix='/nodes')
-    
-    # Run the API
 
+    # Run the API
+    t = Thread(target=user_interface, args=[bootstrap.bootstrap, ""])
+    t.start()
     print(f"Bootstrap has joined the network.")
     app.run(host="0.0.0.0", port=Constants.BOOTSTRAP_PORT)
 else:
     ip_address = myIP() # TODO: Replace this maybe. Find it automatically?
     node = Node(ip_address, args.port)
-    node.request_to_join_network_and_get_assigned_id()
+    node.join_network()
 
-    while True:
-        print(f"[Node {node.id}] Enter your command:")
-        line = input(">>> ")
-        node.execute_cmd(line)
+    user_interface(node)
 
     # TODO: node also listens on endpoints
     # (maybe split the files to bootstrap_app and node_app for this)
