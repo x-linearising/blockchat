@@ -11,7 +11,7 @@ from constants import Constants
 class BootstrapController:
     
     def __init__(self):
-        self.bootstrap = Bootstrap(Constants.BOOTSTRAP_IP_ADDRESS, Constants.BOOTSTRAP_PORT)
+        self.bootstrap = Bootstrap()
         self.blueprint = Blueprint("nodes", __name__)
         self.nodes_counter = 1
         self.is_bootstrapping_phase_over = False
