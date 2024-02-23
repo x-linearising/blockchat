@@ -4,6 +4,7 @@ import requests
 
 from constants import Constants
 from request_classes.join_request import JoinRequest
+from response_classes.join_response import JoinResponse
 from wallet import Wallet
 from transaction import TransactionBuilder
 
@@ -39,18 +40,15 @@ class Node(NodeInfo):
         logging.info("Sending request to Boostrap Node to join the network.")
 
         # Make request to boostrap node
-        join_request = {
-            "public_key": self.public_key,
-            "ip_address": self.ip_address,
-            "port": self.port
-        }
+        join_request = JoinRequest(self.public_key, self.ip_address, self.port)
 
         join_response = requests.post(Constants.get_bootstrap_node_url() + "/nodes",
-                                      json=join_request,
+                                      json=join_request.to_dict(),
                                       headers=Constants.JSON_HEADER)
 
         if join_response.ok:
-            self.id = join_response.json().get("id")
+            response = JoinResponse.from_json(join_response.json())
+            self.id = response.id
             logging.info(f"Joined the network successfully with id {self.id}. Waiting for bootstrap phase completion.")
         else:
             logging.error(f"""Could not join the network. Bootstrap node responded 
