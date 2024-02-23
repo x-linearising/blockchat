@@ -44,6 +44,11 @@ else:
     ip_address = myIP() # TODO: Replace this maybe. Find it automatically?
     node = Node(ip_address, args.port)
     node.request_to_join_network_and_get_assigned_id()
-    # TODO: parse reply and do node.id = reply.id
+
+    while True:
+        print(f"[Node {node.id}] Enter your command:")
+        line = input(">>> ")
+        node.execute_cmd(line)
+
     # TODO: node also listens on endpoints
     # (maybe split the files to bootstrap_app and node_app for this)

@@ -38,6 +38,45 @@ class Node(NodeInfo):
         # Assign returned id to node
         self.id = response.id
 
+    def create_tx(self, recv, type, payload):
+        print(f"[Stub Method] Node {self.id} sends a transaction")
+
+    def stake(self, amount):
+        print(f"[Stub Method] Node {self.id} stakes {amount}")
+
+    def view_block(self):
+        print(f"[Stub Method] Node {self.id} views the last block")
+
+    def balance(self):
+        print(f"[Stub Method] Node {self.id} views its balance")
+
+    def execute_cmd(self, line: str):
+        # remove leading whitespace, if any
+        line = line.lstrip()
+        if line.startswith("t "):
+            items = line.split(" ")
+            try:
+                amount = float(items[2])
+                self.create_tx(items[1], "a", amount)
+            except ValueError:
+                self.create_tx(items[1], "m", items[2])
+        elif line.startswith("stake "):
+            items = line.split(" ")
+            try:
+                amount = float(items[1])
+                self.stake(amount)
+            except ValueError:
+                print("[Error] Stake amount must be a number!")
+        elif line == "view":
+            self.view_block()
+        elif line == "balance":
+            self.balance()
+        elif line == "help":
+            print("<help shown here>")
+        else:
+            print("Invalid Command! You can view valid commands with \'help\'")
+
+
 class Bootstrap(Node):
     def __init__(self):
         super().__init__(Constants.BOOTSTRAP_IP_ADDRESS,
