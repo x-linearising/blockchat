@@ -16,7 +16,7 @@ class Bootstrap(Node):
         self.genesis()
 
     def genesis(self):
-        genesis_tx = self.tx_builder(
+        genesis_tx = self.tx_builder.create(
             Constants.BOOTSTRAP_PUBLIC_KEY,
             TransactionType.AMOUNT.value,
             Constants.STARTING_BCC_PER_NODE * Constants.MAX_NODES    
@@ -24,7 +24,7 @@ class Bootstrap(Node):
 
         genesis_block = Block(0, time(), [genesis_tx], self.public_key, 1)
         genesis_block.block_hash = genesis_block.hash()
-
+        
         self.blockchain.add(genesis_block)
         self.bcc = Constants.STARTING_BCC_PER_NODE * Constants.MAX_NODES
 
