@@ -65,6 +65,7 @@ class TransactionBuilder:
 
         return json.dumps(tx)
 
+    # TODO: No need for this to be a separate method? Move this to Bootstrap?
     def create_genesis_transaction(self):
         # TODO: ID or address here?
         return self.create(Constants.BOOTSTRAP_ID,

@@ -42,15 +42,14 @@ class Block(Hashable):
         return {
             'id': self.id,
             'timestamp': time.time(),
-            'transactions': self.transactions,
+            'transactions': self.transactions,  # TODO: Is this dict?
         }
 
-
+    # TODO: One constructor instead of three.
     @classmethod
     def construct_validated_block(cls, id, timestamp, transactions, validator, hash, prev_hash):
         return cls(id, timestamp, transactions, validator, hash, prev_hash)
 
-    # TODO: Better name?
     @classmethod
     def construct_block(cls, prev_block, transactions, cur_node):
         block = cls(id=prev_block.id + 1,

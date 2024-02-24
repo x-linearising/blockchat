@@ -45,7 +45,7 @@ def to_deep_dict(obj):
     else:
         return obj
 
-
+# TODO: Make these methods, instead of class.
 class Hashable:
     # Could make a constructor that initializes hash.
 
