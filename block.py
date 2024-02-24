@@ -38,6 +38,42 @@ class Block():
                 "transactions": self.transactions
             }
 
+    def to_str(self, summarized=True, indent=1):
+        tabs = indent * "\t"
+        s = tabs + f"prev hash: {self.prev_hash}\n"
+        s += tabs + f"hash: {self.block_hash}\n"
+        s += tabs +  f"index: {self.idx}\n"
+        s += tabs +  f"timestamp: {self.timestamp}\n"
+        if summarized:
+            s += tabs + f"validator: ...{self.validator[100:110]}...\n"
+        else:
+            s += tabs + f"validator: {self.validator}\n"
+        
+        s += tabs + f"transactions: [\n"
+        
+        for tx in self.transactions:
+            s += tabs + "\thash: {}\n".format(tx["hash"])
+            if summarized:
+                s += tabs + "\tsign: ...{}...\n".format(tx["sign"][100:110]) 
+                s += tabs + "\tsender_addr: ...{}...\n".format(tx["contents"]["sender_addr"][100:110])
+            else:   
+                s += tabs + "\tsign: {}\n".format(tx["sign"])
+                s += tabs + "\tsender_addr: {}\n".format(tx["contents"]["sender_addr"])
+            
+            # TODO: CHANGE THIS WHEN A CONSTANT, KNOWN PUBLIC KEY
+            # IS DEFINED FOR THE BOOTSTRAP NODE IN CONSTANTS!
+            if False:
+                s += tabs + "\trecv_addr: ...{}...\n".format(tx["contents"]["recv_addr"][100:110])
+            else:
+                s += tabs + "\trecv_addr: {}\n".format(tx["contents"]["recv_addr"])
+            s += tabs + "\ttype: {}\n".format(tx["contents"]["type"])
+            s += tabs + "\tamount: {}\n".format(tx["contents"]["amount"])
+            s += tabs + "\tmessage: {}\n".format(tx["contents"]["message"])
+            s += tabs + "\tnonce: {}\n".format(tx["contents"]["nonce"])
+        s += tabs + "]"
+        return s
+
+
     def hash(self):
         return hash_dict(self.contents())
 
