@@ -15,6 +15,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("-b", "--bootstrap", action = argparse.BooleanOptionalAction, default = False)
 parser.add_argument("-p", "--port", nargs = "?", const = "8000", default = "8000")
 args = parser.parse_args()
+# args.bootstrap = True if args.port == '5000' else False
 
 print("-----------------------------------------------------------")
 print("""
@@ -31,7 +32,7 @@ print("-----------------------------------------------------------")
 controller = BootstrapController() if args.bootstrap else NodeController(myIP(), args.port)
 
 # Add routes / endpoints.
-app.register_blueprint(controller.blueprint, url_prefix='/nodes')
+app.register_blueprint(controller.blueprint, url_prefix='/')
 
 app.run(host="0.0.0.0", port=Constants.BOOTSTRAP_PORT if args.bootstrap else args.port)
 

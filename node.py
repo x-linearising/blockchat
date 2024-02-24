@@ -2,6 +2,7 @@ import logging
 
 import requests
 
+from blockchain import Blockchain
 from constants import Constants
 from request_classes.join_request import JoinRequest
 from response_classes.join_response import JoinResponse
@@ -14,6 +15,7 @@ class NodeInfo:
         self.ip_address = ip_address
         self.port = port
         self.public_key = public_key
+        self.bcc = 0
 
     def get_node_url(self):
         url = f"http://{self.ip_address}:{self.port}"
@@ -30,6 +32,9 @@ class Node(NodeInfo):
             self.join_network()  # TODO: Maybe move this in Controller?
         else:
             self.id = node_id
+        self.blockchain = Blockchain()
+        self.transactions = []
+
 
     def join_network(self):
         """
@@ -103,3 +108,5 @@ class Node(NodeInfo):
             print("<help shown here>")
         else:
             print("Invalid Command! You can view valid commands with \'help\'")
+
+

@@ -1,9 +1,11 @@
 import logging
 
+from block import Block
 from constants import Constants
 from node import Node, NodeInfo
 from request_classes.join_request import JoinRequest
 from request_classes.node_list_request import NodeListRequest
+from transaction import TransactionType
 
 
 class Bootstrap(Node):
@@ -11,9 +13,22 @@ class Bootstrap(Node):
         super().__init__(Constants.BOOTSTRAP_IP_ADDRESS,
                          Constants.BOOTSTRAP_PORT,
                          Constants.BOOTSTRAP_ID)
+        self.genesis()
+
+    def genesis(self):
+        genesis_block = Block.construct_genesis_block(self.tx_builder)
+        self.blockchain.blocks.append(genesis_block)
+        self.bcc = Constants.STARTING_BCC_PER_NODE * Constants.MAX_NODES
 
     def add_node(self, request: JoinRequest, id: int):
         self.other_nodes[id] = NodeInfo(request.ip_address, request.port, request.public_key)
+        tx = self.tx_builder.create(recv_addr=self.public_key,
+                                    trans_type=TransactionType.AMOUNT.value,
+                                    payload=Constants.STARTING_BCC_PER_NODE)
+        self.transactions.append(tx)
+        self.other_nodes[id].bcc = Constants.STARTING_BCC_PER_NODE
+        self.bcc -= Constants.STARTING_BCC_PER_NODE
+
 
     def node_has_joined(self, ip_address, port):
         for node in self.other_nodes.values():

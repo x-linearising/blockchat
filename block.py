@@ -4,6 +4,10 @@ import struct
 from base64 import b64encode
 from cryptography.hazmat.primitives import hashes
 import PoS
+from constants import Constants
+from helper import Hashable
+from transaction import TransactionBuilder
+
 
 def sha256hash(data: bytes) -> bytes:
     digest = hashes.Hash(hashes.SHA256())
@@ -24,19 +28,50 @@ def create_hash(data):
 Genesis block contains id=0, validator=0, previous_hash=1
 and is not validated!
 """
-class block:
-    def __init__(self, prev_block, transactions, cur_node, is_genesis=0):
-        self.id = 0 if is_genesis else prev_block.id + 1
-        self.timestamp = time.time()
+class Block(Hashable):
+    def __init__(self, id, timestamp, transactions, validator, hash, prev_hash):
+        self.id = id
+        self.timestamp = timestamp
         self.transactions = transactions
-        self.to_hash = {
+        self.validator = validator
+        self.hash = hash
+        self.prev_hash = prev_hash
+
+    # TODO: Only these?
+    def get_hashable_part_as_dict(self):
+        return {
             'id': self.id,
             'timestamp': time.time(),
             'transactions': self.transactions,
         }
-        self.hash = create_hash(self.to_hash)
-        self.prev_hash = 1 if is_genesis else prev_block.hash
-        self.validator = 0 if is_genesis else cur_node # current node's publc key
+
+
+    @classmethod
+    def construct_validated_block(cls, id, timestamp, transactions, validator, hash, prev_hash):
+        return cls(id, timestamp, transactions, validator, hash, prev_hash)
+
+    # TODO: Better name?
+    @classmethod
+    def construct_block(cls, prev_block, transactions, cur_node):
+        block = cls(id=prev_block.id + 1,
+                   timestamp=time.time(),
+                   transactions=transactions,
+                   validator=cur_node,
+                   hash=None,
+                   prev_hash=prev_block.hash)
+        block.hash = block.get_hash()
+
+    @classmethod
+    def construct_genesis_block(cls, tx_builder: TransactionBuilder):
+        block = cls(id=0,
+                    timestamp=time.time(),
+                    transactions=[tx_builder.create_genesis_transaction()],
+                    validator=Constants.BOOTSTRAP_ID,
+                    hash=None,
+                    prev_hash=1)
+        block.hash = block.get_hash()  # Watch out, has not been encoded/decoded.
+        return block
+
 
     """
         theoro oti to transaction list exei ginei validate apo ton current node
@@ -46,12 +81,12 @@ class block:
 def mint_block(node, transactions, capacity, blockchain):
     # if the number of transactions has reached to max block capacity, node runs proof of stake
     if len(transactions) == capacity:
-        strategy = PoS(stakes)
+        strategy = PoS(PoS.stakes)
         cur_block_validator = strategy.select_validator()
         # if the current node is the block validator
         if node.id == cur_block_validator:
             # create the new block
-            new_block = block(blockchain[-1], transactions, node)
+            new_block = Block(blockchain[-1], transactions, node)
             # insert it to blockchain (list of all blocks)
             blockchain.append(new_block)
 
