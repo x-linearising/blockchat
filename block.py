@@ -10,10 +10,6 @@ from helper import Hashable, hash_dict, sha256hash
 from transaction import TransactionBuilder, verify_tx
 
 
-"""
-Genesis block contains id=0, validator=0, previous_hash=1
-and is not validated!
-"""
 class Block():
     def __init__(self, idx, timestamp, transactions, validator, prev_hash, block_hash=None):
         self.idx = idx
@@ -39,18 +35,6 @@ class Block():
         my_hash = hash_dict(self.contents())
         return my_hash == self.block_hash
             
-    @classmethod
-    def construct_genesis_block(cls, tx_builder: TransactionBuilder):
-        block = cls(id=0,
-                    timestamp=time.time(),
-                    transactions=[tx_builder.create_genesis_transaction()],
-                    validator=Constants.BOOTSTRAP_ID,
-                    hash=None,
-                    prev_hash=1)
-        block.hash = block.get_hash()  # Watch out, has not been encoded/decoded.
-        return block
-
-
     """
         theoro oti to transaction list exei ginei validate apo ton current node
         kapws prepei na ferw to blockchain = list of blocks

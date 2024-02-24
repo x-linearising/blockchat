@@ -63,13 +63,6 @@ class TransactionBuilder:
 
         return json.dumps(tx)
 
-    def create_genesis_transaction(self):
-        # TODO: ID or address here?
-        return self.create(Constants.BOOTSTRAP_ID,
-                           TransactionType.AMOUNT.value,
-                           Constants.STARTING_BCC_PER_NODE * Constants.MAX_NODES)
-
-
 def verify_tx(tx: str) -> bool:
     tx = json.loads(tx)
     tx_bytes = struct.pack("!" + str(len(tx["contents"])) + "s", bytes(tx["contents"], "ascii"))

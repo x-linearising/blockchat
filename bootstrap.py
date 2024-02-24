@@ -1,5 +1,5 @@
 import logging
-
+from time import time
 from block import Block
 from constants import Constants
 from node import Node, NodeInfo
@@ -16,8 +16,16 @@ class Bootstrap(Node):
         self.genesis()
 
     def genesis(self):
-        genesis_block = Block.construct_genesis_block(self.tx_builder)
-        self.blockchain.blocks.append(genesis_block)
+        genesis_tx = self.tx_builder(
+            Constants.BOOTSTRAP_PUBLIC_KEY,
+            TransactionType.AMOUNT.value,
+            Constants.STARTING_BCC_PER_NODE * Constants.MAX_NODES    
+        )
+
+        genesis_block = Block(0, time(), [genesis_tx], self.public_key, 1)
+        genesis_block.block_hash = genesis_block.hash()
+
+        self.blockchain.add(genesis_block)
         self.bcc = Constants.STARTING_BCC_PER_NODE * Constants.MAX_NODES
 
     def add_node(self, request: JoinRequest, id: int):
