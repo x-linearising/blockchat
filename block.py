@@ -55,16 +55,6 @@ class Block():
         return my_hash == self.block_hash
             
     @classmethod
-    def construct_block(cls, prev_block, transactions, cur_node):
-        block = cls(id=prev_block.id + 1,
-                   timestamp=time.time(),
-                   transactions=transactions,
-                   validator=cur_node,
-                   hash=None,
-                   prev_hash=prev_block.hash)
-        block.hash = block.get_hash()
-
-    @classmethod
     def construct_genesis_block(cls, tx_builder: TransactionBuilder):
         block = cls(id=0,
                     timestamp=time.time(),

@@ -32,8 +32,10 @@ class Node(NodeInfo):
             self.join_network()  # TODO: Maybe move this in Controller?
         else:
             self.id = node_id
-        self.blockchain = Blockchain()
+        
         self.transactions = []
+        self.stakes = {}
+        self.blockchain = Blockchain()
 
 
     def join_network(self):
@@ -70,6 +72,20 @@ class Node(NodeInfo):
                 # TODO: Handle this?
                 logging.error(f"Request to node {node_id} failed with status code: {response.status_code}.")
 
+    def _choose_txs_algo(self):
+        # must return CAPACITY transactions
+        return "TODO"
+
+    def next_block(self):
+        b = Block(
+                self.blockchain.blocks[-1].idx + 1,
+                time.time(),
+                self._choose_txs_algo(),
+                self.public_key,
+                self.blockchain.blocks[-1].hash
+            )
+        b.block_hash = b.hash()
+        return b
 
     def create_tx(self, recv, type, payload):
         print(f"[Stub Method] Node {self.id} sends a transaction")
