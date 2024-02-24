@@ -1,3 +1,5 @@
+import logging
+
 import requests
 
 from constants import Constants
@@ -6,20 +8,28 @@ from response_classes.join_response import JoinResponse
 from wallet import Wallet
 from transaction import TransactionBuilder
 
+
 class NodeInfo:
-    def __init__(self, ip_address, port):
+    def __init__(self, ip_address, port, public_key=None):
         self.ip_address = ip_address
         self.port = port
-        self.public_key = None
+        self.public_key = public_key
+
+    def get_node_url(self):
+        url = f"http://{self.ip_address}:{self.port}"
+        return url
+
 
 class Node(NodeInfo):
     def __init__(self, ip_address, port, node_id=None):
-        super().__init__(ip_address, port)
-        self.id = node_id
-        self.other_nodes = {}
         self.wallet = Wallet()
-        self.public_key = self.wallet.public_key
+        self.other_nodes = {}
         self.tx_builder = TransactionBuilder(self.wallet)
+        super().__init__(ip_address, port, self.wallet.public_key)
+        if node_id is None:
+            self.join_network()  # TODO: Maybe move this in Controller?
+        else:
+            self.id = node_id
 
     def join_network(self):
         """
@@ -27,16 +37,34 @@ class Node(NodeInfo):
         If the join is successful, the node is assigned an id.
         """
 
+        logging.info("Sending request to Boostrap Node to join the network.")
+
         # Make request to boostrap node
-        request = JoinRequest(self.public_key, self.ip_address, self.port)
+        join_request = JoinRequest(self.public_key, self.ip_address, self.port)
 
-        raw_response = requests.post(Constants.get_bootstrap_node_url() + "/nodes",
-                                     json=request.to_dict(),
+        join_response = requests.post(Constants.BOOTSTRAP_URL + "/nodes",
+                                      json=join_request.to_dict(),
+                                      headers=Constants.JSON_HEADER)
+
+        if join_response.ok:
+            response = JoinResponse.from_json(join_response.json())
+            self.id = response.id
+            logging.info(f"Joined the network successfully with id {self.id}. Waiting for bootstrap phase completion.")
+        else:
+            logging.error(f"""Could not join the network. Bootstrap node responded 
+                          with status [{join_response.status_code}] and message [{join_response.text}].""")
+
+    def broadcast_request(self, request_body, endpoint):
+        for node_id, node in self.other_nodes.items():
+            response = requests.post(node.get_node_url() + endpoint,
+                                     json=request_body,
                                      headers=Constants.JSON_HEADER)
-        response = JoinResponse.from_json(raw_response.json())
+            if response.ok:
+                logging.info(f"Request to node {node_id} was successful with status code: {response.status_code}.")
+            else:
+                # TODO: Handle this?
+                logging.error(f"Request to node {node_id} failed with status code: {response.status_code}.")
 
-        # Assign returned id to node
-        self.id = response.id
 
     def create_tx(self, recv, type, payload):
         print(f"[Stub Method] Node {self.id} sends a transaction")
@@ -75,19 +103,3 @@ class Node(NodeInfo):
             print("<help shown here>")
         else:
             print("Invalid Command! You can view valid commands with \'help\'")
-
-
-class Bootstrap(Node):
-    def __init__(self):
-        super().__init__(Constants.BOOTSTRAP_IP_ADDRESS,
-                         Constants.BOOTSTRAP_PORT,
-                         Constants.BOOTSTRAP_ID)
-
-    def add_node(self, request: JoinRequest, id: int):
-        self.other_nodes[id] = (request.ip_address, request.port, request.public_key)
-
-    def node_has_joined(self, ip_address, port):
-        for node_ip, node_port, _ in self.other_nodes.values():
-            if node_ip == ip_address and node_port == port:
-                return True
-        return False

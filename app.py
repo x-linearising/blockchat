@@ -3,8 +3,7 @@ import argparse
 from threading import Thread
 from flask import Flask
 from flask_restful import Api
-from controllers.bootstrap_controller import BootstrapController
-from node import Node, Bootstrap
+from controllers.controller import BootstrapController, NodeController
 from constants import Constants
 from helper import myIP
 
@@ -14,12 +13,14 @@ def user_interface(node, prompt_str=">>> "):
         line = input(prompt_str)
         node.execute_cmd(line)    
 
+app = Flask(__name__)
+api = Api(app)
+logging.basicConfig(level=logging.INFO)
+
 parser = argparse.ArgumentParser()
 parser.add_argument("-b", "--bootstrap", action = argparse.BooleanOptionalAction, default = False)
 parser.add_argument("-p", "--port", nargs = "?", const = "8000", default = "8000")
 args = parser.parse_args()
-
-is_bootstrap = args.bootstrap
 
 print("-----------------------------------------------------------")
 print("""
@@ -32,28 +33,12 @@ print("""
 """)
 print("-----------------------------------------------------------")
 
-if is_bootstrap:
-    app = Flask(__name__)
-    api = Api(app)
-    logging.basicConfig(level=logging.INFO)
+controller = BootstrapController() if args.bootstrap else NodeController(myIP(), args.port)
 
-    # Set up node, basically its memory.
-    bootstrap = BootstrapController()
+# Add routes / endpoints.
+app.register_blueprint(controller.blueprint, url_prefix='/nodes')
 
-    # Add routes / endpoints.
-    app.register_blueprint(bootstrap.blueprint, url_prefix='/nodes')
-
-    # Run the API
-    t = Thread(target=user_interface, args=[bootstrap.bootstrap, ""])
-    t.start()
-    print(f"Bootstrap has joined the network.")
-    app.run(host="0.0.0.0", port=Constants.BOOTSTRAP_PORT)
-else:
-    ip_address = myIP() # TODO: Replace this maybe. Find it automatically?
-    node = Node(ip_address, args.port)
-    node.join_network()
-
-    user_interface(node)
-
-    # TODO: node also listens on endpoints
-    # (maybe split the files to bootstrap_app and node_app for this)
+t = Thread(target=user_interface, args=[controller.node, ""])
+t.start()
+print(f"Bootstrap has joined the network.")
+app.run(host="0.0.0.0", port=Constants.BOOTSTRAP_PORT if args.bootstrap else args.port)
