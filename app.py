@@ -4,6 +4,7 @@ import argparse
 from flask import Flask
 from flask_restful import Api
 from controllers.controller import BootstrapController, NodeController
+from constants import Constants
 from helper import myIP
 
 app = Flask(__name__)
@@ -32,7 +33,7 @@ controller = BootstrapController() if args.bootstrap else NodeController(myIP(),
 # Add routes / endpoints.
 app.register_blueprint(controller.blueprint, url_prefix='/nodes')
 
-app.run(host="0.0.0.0", port=args.port)
+app.run(host="0.0.0.0", port=Constants.BOOTSTRAP_PORT if args.bootstrap else args.port)
 
 # TODO: Run cli in separate process
 try:
