@@ -1,5 +1,4 @@
 import json
-from base64 import b64decode
 from block import Block
 
 class BlockchainRequest:

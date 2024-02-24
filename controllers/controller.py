@@ -11,7 +11,7 @@ from request_classes.node_list_request import NodeListRequest
 from request_classes.join_request import JoinRequest
 from response_classes.join_response import JoinResponse
 from constants import Constants
-from transaction import verify_tx
+from transaction import verify_tx, TransactionType
 
 
 class NodeController:
@@ -42,7 +42,7 @@ class NodeController:
         if not verify_tx(transaction_as_string):
             return "Invalid signature.", 400
 
-        if tx_contents["type"] == "m":
+        if tx_contents["type"] == TransactionType.MESSAGE.value:
             transaction_cost = len(tx_contents["message"])
         else:
             transaction_cost = tx_contents["amount"] * Constants.TRANSFER_FEE_MULTIPLIER

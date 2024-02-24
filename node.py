@@ -9,7 +9,7 @@ from constants import Constants
 from request_classes.join_request import JoinRequest
 from response_classes.join_response import JoinResponse
 from wallet import Wallet
-from transaction import TransactionBuilder
+from transaction import TransactionBuilder, TransactionType
 
 
 class NodeInfo:
@@ -121,9 +121,9 @@ class Node(NodeInfo):
             items = line.split(" ")
             try:
                 amount = float(items[2])
-                self.create_tx(items[1], "a", amount)
+                self.create_tx(items[1], TransactionType.AMOUNT.value, amount)
             except ValueError:
-                self.create_tx(items[1], "m", items[2])
+                self.create_tx(items[1], TransactionType.MESSAGE.value, items[2])
         elif line.startswith("stake "):
             items = line.split(" ")
             try:
