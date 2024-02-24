@@ -6,14 +6,9 @@ from cryptography.hazmat.primitives import hashes
 import PoS
 from constants import Constants
 import wallet
-from helper import Hashable, hash_dict
+from helper import Hashable, hash_dict, sha256hash
 from transaction import TransactionBuilder, verify_tx
 
-
-def sha256hash(data: bytes) -> bytes:
-    digest = hashes.Hash(hashes.SHA256())
-    digest.update(data)
-    return digest.finalize()
 
 def create_hash(data):
     # convert dictionary to json string
