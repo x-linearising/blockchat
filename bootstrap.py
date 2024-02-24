@@ -47,10 +47,14 @@ class Bootstrap(Node):
 
     def broadcast_node_list(self):
         # Adds itself to the list
-        complete_list = self.other_nodes.copy()  # TODO: Check if this is deep copy.
+        complete_list = self.other_nodes.copy()
         complete_list[self.id] = NodeInfo(self.ip_address,
                                           self.port,
                                           self.public_key)
+        print("Will broadcast")
+        print(complete_list)
+        print("\n but my list is\n")
+        print(self.other_nodes)
 
         # Send list to each node
         node_list_request = NodeListRequest.from_node_info_dict_to_request(complete_list)

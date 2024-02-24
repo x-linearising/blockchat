@@ -19,14 +19,24 @@ class Block():
         self.block_hash = block_hash
         self.prev_hash = prev_hash
 
-    def contents(self):
-        return {
-            "index": self.idx,
-            "timestamp": self.timestamp,
-            "transactions": self.transactions,
-            "validator": self.validator,
-            "prev_hash": self.prev_hash
-        }
+    def contents(self, include_hash=False):
+        if include_hash:
+            return {
+                "prev_hash": self.prev_hash,
+                "index": self.idx,
+                "timestamp": self.timestamp,
+                "validator": self.validator,
+                "transactions": self.transactions,
+                "hash": b64encode(self.block_hash).decode()
+            }
+        else:
+            return {
+                "prev_hash": self.prev_hash,
+                "index": self.idx,
+                "timestamp": self.timestamp,
+                "validator": self.validator,
+                "transactions": self.transactions
+            }
 
     def hash(self):
         return hash_dict(self.contents())

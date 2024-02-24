@@ -1,10 +1,6 @@
 import json
-
-import helper
+from base64 import b64decode
 from block import Block
-from blockchain import Blockchain
-from transaction import TransactionContents
-
 
 class BlockchainRequest:
     """
@@ -13,42 +9,43 @@ class BlockchainRequest:
     """
 
     @classmethod
-    def from_blockchain_to_request(cls, blockchain: Blockchain):
-        request = []
-        for block in blockchain.blocks:
-            request.append(helper.to_deep_dict(block)) # Encode/Decode hash.
+    def from_blockchain_to_request(cls, blockchain):
+        request = [block.contents(include_hash=True) for block in blockchain.blocks]
         return request
 
     @classmethod
     def from_request_to_blocks(cls, request):
         blocks = []
         for block in request:
-            transactions_raw = block["transactions"]
+            # Read the block's transactions...
+            block_txs = block["transactions"]
+            # ...and parse them into this list
             transactions = []
-            for transaction in transactions_raw:
-                contents = json.loads(transaction)["contents"]  # TODO: Fix json loads.
-                contents = json.loads(contents)
-                contents = TransactionContents(
-                    contents["sender_addr"],
-                    contents["recv_addr"],
-                    contents["trans_type"],
-                    contents["amount"],
-                    contents["message"],
-                    contents["nonce"]
-                )
-
+            for tx in block_txs:
+                tx = json.loads(tx)
+                tx_contents = json.loads(tx["contents"])
+                tx_hash = tx["hash"]
+                tx_sign = tx["sign"]
+                contents = {
+                    "sender_addr": tx_contents["sender_addr"],
+                    "recv_addr": tx_contents["recv_addr"],
+                    "type": tx_contents["type"],
+                    "amount": tx_contents["amount"],
+                    "message": tx_contents["message"],
+                    "nonce": tx_contents["nonce"]
+                }
                 transactions.append({
                     "contents": contents,
-                    "hash": json.loads(transaction)["hash"],
-                    "sign": json.loads(transaction)["sign"]
+                    "hash": tx_hash,
+                    "sign": tx_sign
                 })
 
             blocks.append(Block(
-                block["id"],
+                block["index"],
                 block["timestamp"],
                 transactions,
                 block["validator"],
-                block["hash"],
-                block["prev_hash"]
+                block["prev_hash"],
+                block["hash"]
             ))
         return blocks

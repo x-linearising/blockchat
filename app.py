@@ -36,13 +36,14 @@ app.register_blueprint(controller.blueprint, url_prefix='/')
 
 app.run(host="0.0.0.0", port=Constants.BOOTSTRAP_PORT if args.bootstrap else args.port)
 
-# TODO: Run cli in separate process
-try:
-    while True:
-        print(f"[Node {controller.node.id}] Enter your command:")
-        line = input(">>> ")
-        controller.node.execute_cmd(line)
-except KeyboardInterrupt:
-    print("Shutting down app and cli.")
+# TODO: Run cli in separate process (merged on master, ignore this.)
+
+# try:
+#     while True:
+#         print(f"[Node {controller.node.id}] Enter your command:")
+#         line = input(">>> ")
+#         controller.node.execute_cmd(line)
+# except KeyboardInterrupt:
+#     print("Shutting down app and cli.")
 
 # (maybe split the files to bootstrap_app and node_app for this)

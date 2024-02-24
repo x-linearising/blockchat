@@ -55,6 +55,7 @@ class NodeController:
 
         # Updating node list
         self.node.blockchain.blocks = blocks
+        
         logging.info("Blockchain has been updated successfully.")
 
         # No need for response body. Responding with status 200.
