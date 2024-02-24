@@ -5,8 +5,9 @@ from base64 import b64encode
 from cryptography.hazmat.primitives import hashes
 import PoS
 from constants import Constants
-from helper import Hashable
-from transaction import TransactionBuilder
+import wallet
+from helper import Hashable, hash_dict
+from transaction import TransactionBuilder, verify_tx
 
 
 def sha256hash(data: bytes) -> bytes:
@@ -28,29 +29,31 @@ def create_hash(data):
 Genesis block contains id=0, validator=0, previous_hash=1
 and is not validated!
 """
-class Block(Hashable):
-    def __init__(self, id, timestamp, transactions, validator, hash, prev_hash):
-        self.id = id
+class Block():
+    def __init__(self, idx, timestamp, transactions, validator, prev_hash, block_hash=None):
+        self.idx = idx
         self.timestamp = timestamp
         self.transactions = transactions
         self.validator = validator
-        self.hash = hash
+        self.block_hash = block_hash
         self.prev_hash = prev_hash
 
-    # TODO: Only these?
-    def get_hashable_part_as_dict(self):
+    def contents(self):
         return {
-            'id': self.id,
-            'timestamp': time.time(),
-            'transactions': self.transactions,
+            "index": self.idx,
+            "timestamp": self.timestamp,
+            "transactions": self.transactions,
+            "validator": self.validator,
+            "prev_hash": self.prev_hash
         }
 
+    def hash(self):
+        return hash_dict(self.contents())
 
-    @classmethod
-    def construct_validated_block(cls, id, timestamp, transactions, validator, hash, prev_hash):
-        return cls(id, timestamp, transactions, validator, hash, prev_hash)
-
-    # TODO: Better name?
+    def validate(self):
+        my_hash = hash_dict(self.contents())
+        return my_hash == self.block_hash
+            
     @classmethod
     def construct_block(cls, prev_block, transactions, cur_node):
         block = cls(id=prev_block.id + 1,
@@ -99,3 +102,19 @@ def broadcast_block(validator_node, new_block):
 def validate_block(validator_node, new_block):
 
     return
+
+if __name__ == "__main__":
+    w = wallet.Wallet()
+    t = TransactionBuilder(w)
+    tx = t.create("some_addr", "a", 1337)
+    res = verify_tx(tx)
+    if res:
+        print("Tx was verified!")
+
+    b = Block("0", time.time(), [tx, tx], "aaaaaa", "0xdeadbeef", block_hash=None)
+    
+    b.block_hash = b.hash()
+    if b.validate():
+        print("Block was validated")
+    else:
+        print("[Error] Block was NOT verified.")
