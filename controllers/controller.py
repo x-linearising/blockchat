@@ -119,18 +119,3 @@ class BootstrapController(NodeController):
             log_message = "Bad request: Node with given ip and port has already been added."
             logging.warning(log_message)
             abort(400, description=log_message)
-
-    def broadcast_blockchain(self):
-        blockchain_request = BlockchainRequest.from_blockchain_to_request(self.node.blockchain)
-        for node_id, node in self.node.other_nodes.items():
-            response = requests.post(node.get_node_url() + "/blockchain",
-                                     json=blockchain_request,
-                                     headers=Constants.JSON_HEADER)
-            if response.ok:
-                logging.info(f"Request to node {node_id} was successful with status code: {response.status_code}.")
-            else:
-                logging.error(f"Request to node {node_id} failed with status code: {response.status_code}.")
-
-        logging.info("Bootstrap phase complete. All nodes have received the blockchain.")
-
-
