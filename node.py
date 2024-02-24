@@ -1,7 +1,9 @@
 import logging
+import time
 
 import requests
 
+from block import Block
 from blockchain import Blockchain
 from constants import Constants
 from request_classes.join_request import JoinRequest
@@ -25,7 +27,7 @@ class NodeInfo:
 class Node(NodeInfo):
     def __init__(self, ip_address, port, node_id=None):
         self.wallet = Wallet()
-        self.other_nodes = {}
+        self.other_nodes: dict[int, NodeInfo] = {}
         self.tx_builder = TransactionBuilder(self.wallet)
         super().__init__(ip_address, port, self.wallet.public_key)
         if node_id is None:
@@ -37,6 +39,15 @@ class Node(NodeInfo):
         self.stakes = {}
         self.blockchain = Blockchain()
 
+    def get_node_info_by_public_key(self, public_key):
+        for node_info in self.other_nodes.values():
+            if node_info.public_key == public_key:
+                return node_info
+
+    def get_node_id_by_public_key(self, public_key):
+        for node_id, node_info in self.other_nodes.items():
+            if node_info.public_key == public_key:
+                return node_id
 
     def join_network(self):
         """
@@ -88,7 +99,11 @@ class Node(NodeInfo):
         return b
 
     def create_tx(self, recv, type, payload):
+        if recv.isdigit():
+            recv = self.other_nodes[int(recv)].public_key
         print(f"[Stub Method] Node {self.id} sends a transaction")
+        tx_request = self.tx_builder.create(recv, type, payload)
+        self.broadcast_request(tx_request, "/transactions")
 
     def stake(self, amount):
         print(f"[Stub Method] Node {self.id} stakes {amount}")
