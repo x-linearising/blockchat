@@ -4,6 +4,7 @@ import requests
 
 from constants import Constants
 from request_classes.join_request import JoinRequest
+from request_classes.node_list_request import NodeListRequest
 from response_classes.join_response import JoinResponse
 from wallet import Wallet
 from transaction import TransactionBuilder
@@ -27,7 +28,7 @@ class Node(NodeInfo):
         self.tx_builder = TransactionBuilder(self.wallet)
         super().__init__(ip_address, port, self.wallet.public_key)
         if node_id is None:
-            self.join_network()
+            self.join_network()  # TODO: Maybe move this in Controller?
         else:
             self.id = node_id
 
@@ -42,7 +43,7 @@ class Node(NodeInfo):
         # Make request to boostrap node
         join_request = JoinRequest(self.public_key, self.ip_address, self.port)
 
-        join_response = requests.post(Constants.get_bootstrap_node_url() + "/nodes",
+        join_response = requests.post(Constants.BOOTSTRAP_URL + "/nodes",
                                       json=join_request.to_dict(),
                                       headers=Constants.JSON_HEADER)
 
@@ -53,6 +54,17 @@ class Node(NodeInfo):
         else:
             logging.error(f"""Could not join the network. Bootstrap node responded 
                           with status [{join_response.status_code}] and message [{join_response.text}].""")
+
+    def broadcast_request(self, request_body, endpoint):
+        for node_id, node in self.other_nodes.items():
+            response = requests.post(node.get_node_url() + endpoint,
+                                     json=request_body,
+                                     headers=Constants.JSON_HEADER)
+            if response.ok:
+                logging.info(f"Request to node {node_id} was successful with status code: {response.status_code}.")
+            else:
+                # TODO: Handle this?
+                logging.error(f"Request to node {node_id} failed with status code: {response.status_code}.")
 
 
     def create_tx(self, recv, type, payload):
@@ -108,3 +120,16 @@ class Bootstrap(Node):
             if node.ip_address == ip_address and node.port == port:
                 return True
         return False
+
+    def broadcast_node_list(self):
+        # Adds itself to the list
+        complete_list = self.other_nodes.copy()  # TODO: Check if this is deep copy.
+        complete_list[self.id] = NodeInfo(self.ip_address,
+                                          self.port,
+                                          self.public_key)
+
+        # Send list to each node
+        node_list_request = NodeListRequest.from_node_info_dict_to_request(complete_list)
+        self.broadcast_request(node_list_request, "/nodes")
+
+        logging.info("Bootstrap phase complete. All nodes have received the participant list.")

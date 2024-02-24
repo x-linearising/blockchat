@@ -77,7 +77,7 @@ class BootstrapController(NodeController):
         if self.nodes_counter == Constants.MAX_NODES:
             self.is_bootstrapping_phase_over = True
             logging.info("Reached maximum number of nodes. Sending the final node list to all participants.")
-            thread = threading.Thread(target=self.broadcast_node_list)  # Thread because it needs to run after response.
+            thread = threading.Thread(target=self.node.broadcast_node_list)  # TODO: This needs to run after response. Write it better?
             thread.start()
 
         return response.to_dict()
@@ -92,25 +92,5 @@ class BootstrapController(NodeController):
             log_message = "Bad request: Node with given ip and port has already been added."
             logging.warning(log_message)
             abort(400, description=log_message)
-
-    def broadcast_node_list(self):
-        # Adds itself to the list
-        complete_list = self.node.other_nodes.copy()
-        complete_list[self.node.id] = NodeInfo(self.node.ip_address,
-                                               self.node.port,
-                                               self.node.public_key)
-
-        # Send list to each node
-        node_list_request = NodeListRequest.from_node_info_dict_to_request(complete_list)
-        for node_id, node in self.node.other_nodes.items():
-            response = requests.post(node.get_node_url() + "/nodes",
-                                     json=node_list_request,
-                                     headers=Constants.JSON_HEADER)
-            if response.ok:
-                logging.info(f"Request to node {node_id} was successful with status code: {response.status_code}.")
-            else:
-                logging.error(f"Request to node {node_id} failed with status code: {response.status_code}.")
-
-        logging.info("Bootstrap phase complete. All nodes have received the participant list.")
 
 
