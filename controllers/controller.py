@@ -16,8 +16,7 @@ from constants import Constants
 class NodeController:
     
     def __init__(self, ip_address, port):
-        self.blueprint = Blueprint("nodes", __name__)
-        # self.blockchain_blueprint = Blueprint("blockchain", __name__)
+        self.blueprint = Blueprint("bootstrap blueprint", __name__)
         # equivalent to using @self.blueprint.route on add_node
         # (which wouldn't work because of the self prefix)
         self.blueprint.add_url_rule("/nodes", "nodes", self.set_final_node_list, methods=["POST"])

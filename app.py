@@ -1,11 +1,17 @@
 import logging
 import argparse
-
+from threading import Thread
 from flask import Flask
 from flask_restful import Api
 from controllers.controller import BootstrapController, NodeController
 from constants import Constants
 from helper import myIP
+
+def user_interface(node, prompt_str=">>> "):
+    while True:
+        print(f"[Node {node.id}] Enter your command:")
+        line = input(prompt_str)
+        node.execute_cmd(line)    
 
 app = Flask(__name__)
 api = Api(app)
@@ -28,22 +34,12 @@ print("""
 """)
 print("-----------------------------------------------------------")
 
-# Set up node, basically its memory.
 controller = BootstrapController() if args.bootstrap else NodeController(myIP(), args.port)
 
 # Add routes / endpoints.
 app.register_blueprint(controller.blueprint, url_prefix='/')
 
+t = Thread(target=user_interface, args=[controller.node, ""])
+t.start()
+print(f"Bootstrap has joined the network.")
 app.run(host="0.0.0.0", port=Constants.BOOTSTRAP_PORT if args.bootstrap else args.port)
-
-# TODO: Run cli in separate process (merged on master, ignore this.)
-
-# try:
-#     while True:
-#         print(f"[Node {controller.node.id}] Enter your command:")
-#         line = input(">>> ")
-#         controller.node.execute_cmd(line)
-# except KeyboardInterrupt:
-#     print("Shutting down app and cli.")
-
-# (maybe split the files to bootstrap_app and node_app for this)

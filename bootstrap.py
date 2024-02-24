@@ -29,9 +29,10 @@ class Bootstrap(Node):
         self.blockchain.add(genesis_block)
         self.bcc = Constants.STARTING_BCC_PER_NODE * Constants.MAX_NODES
 
+    # TODO: Rename id to index. And hash to obj_hash.
     def add_node(self, request: JoinRequest, id: int):
         self.other_nodes[id] = NodeInfo(request.ip_address, request.port, request.public_key)
-        tx = self.tx_builder.create(recv_addr=self.public_key,
+        tx = self.tx_builder.create(recv_addr=request.public_key,
                                     trans_type=TransactionType.AMOUNT.value,
                                     payload=Constants.STARTING_BCC_PER_NODE)
         self.transactions.append(tx)
