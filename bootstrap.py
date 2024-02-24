@@ -5,6 +5,7 @@ from constants import Constants
 from node import Node, NodeInfo
 from request_classes.join_request import JoinRequest
 from request_classes.node_list_request import NodeListRequest
+from request_classes.blockchain_request import BlockchainRequest
 from transaction import TransactionType
 
 
@@ -58,14 +59,7 @@ class Bootstrap(Node):
         logging.info("Bootstrap phase complete. All nodes have received the participant list.")
 
     def broadcast_blockchain(self):
-        blockchain_request = BlockchainRequest.from_blockchain_to_request(self.node.blockchain)
-        for node_id, node in self.node.other_nodes.items():
-            response = requests.post(node.get_node_url() + "/blockchain",
-                                     json=blockchain_request,
-                                     headers=Constants.JSON_HEADER)
-            if response.ok:
-                logging.info(f"Request to node {node_id} was successful with status code: {response.status_code}.")
-            else:
-                logging.error(f"Request to node {node_id} failed with status code: {response.status_code}.")
+        req = BlockchainRequest.from_blockchain_to_request(self.blockchain)
+        self.broadcast_request(req, "/blockchain")
 
         logging.info("Bootstrap phase complete. All nodes have received the blockchain.")
