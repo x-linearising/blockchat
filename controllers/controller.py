@@ -28,7 +28,7 @@ class NodeController:
         """
         Endpoint hit by the bootstrap node, who sends the final list of nodes to all participating nodes.
         """
-        logging.info(f"Received complete list of nodes: {request.json}.")
+        logging.info(f"Received NodeInfo for {len(request.json)} nodes.")
 
         # Mapping request body to class
         nodes_info = NodeListRequest.from_request_to_node_info_dict(request.json)
@@ -81,8 +81,10 @@ class BootstrapController(NodeController):
         """
 
         # Mapping request body to class
+
         join_request = JoinRequest.from_json(request.json)
-        logging.info(f"Received request to add the following node to the network: {join_request.to_dict()}.")
+        logging.info("Received request to add the following node to the network: {}:{}"
+            .format(request.json["ip_address"], request.json["port"]))
 
         # Performing validations
         self.validate_join_request(join_request)
@@ -90,7 +92,6 @@ class BootstrapController(NodeController):
         # Adding node
         self.node.add_node(join_request, self.nodes_counter)
         logging.info(f"Node with id {self.nodes_counter} has been added to the network.")
-        logging.info(f"Current state of node is: {self.node.__dict__}.")
 
         # Creating response
         response = JoinResponse(self.nodes_counter)
