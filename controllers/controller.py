@@ -4,7 +4,8 @@ import threading
 import requests
 from flask import Blueprint, abort, request
 
-from node import Bootstrap, NodeInfo, Node
+from node import NodeInfo, Node
+from bootstrap import Bootstrap
 from request_classes.node_list_request import NodeListRequest
 from request_classes.join_request import JoinRequest
 from response_classes.join_response import JoinResponse
