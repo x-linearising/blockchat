@@ -1,7 +1,7 @@
 import logging
-import threading
-
 import requests
+from threading import Thread
+from time import sleep
 from flask import Blueprint, abort, request
 
 from node import NodeInfo, Node
@@ -21,7 +21,7 @@ class NodeController:
         # equivalent to using @self.blueprint.route on add_node
         # (which wouldn't work because of the self prefix)
         self.blueprint.add_url_rule("/nodes", "nodes", self.set_final_node_list, methods=["POST"])
-        self.blueprint.add_url_rule("/blockchain", "other", self.set_initial_blockchain, methods=["POST"])
+        self.blueprint.add_url_rule("/blockchain", "blockchain", self.set_initial_blockchain, methods=["POST"])
         self.node = Node(ip_address, port)
 
     def set_final_node_list(self):
@@ -47,7 +47,8 @@ class NodeController:
         """
         Endpoint hit by the bootstrap node, who sends the blockchain after bootstrap phase is complete.
         """
-        logging.info(f"Received initial state of blockchain: {request.json}.")
+
+        logging.info(f"Received initial state of blockchain.")
 
         # Mapping request body to class
         blocks = BlockchainRequest.from_request_to_blocks(request.json)
@@ -60,8 +61,6 @@ class NodeController:
         return '', 200
 
 
-
-
 class BootstrapController(NodeController):
 
     def __init__(self):
@@ -72,6 +71,18 @@ class BootstrapController(NodeController):
         # equivalent to using @self.blueprint.route on add_node
         # (which wouldn't work because of the self prefix)
         self.blueprint.add_url_rule("/nodes", "nodes", self.add_node, methods=["POST"])
+        t = Thread(target=self.poll_node_count)
+        t.start()
+
+    def poll_node_count(self):
+        while True:
+            if self.is_bootstrapping_phase_over:
+                print("[Poll Thread] Bootstrap phase over. Broadcasting...")
+                self.node.broadcast_node_list()
+                self.node.broadcast_blockchain()
+                return
+            else:
+                sleep(1)
 
     def add_node(self):
         """
@@ -100,12 +111,7 @@ class BootstrapController(NodeController):
         # Check if every expected node has joined
         if self.nodes_counter == Constants.MAX_NODES:
             self.is_bootstrapping_phase_over = True
-            logging.info("Reached maximum number of nodes. Sending the final node list to all participants.")
-            thread = threading.Thread(target=self.node.broadcast_node_list)  # TODO: This needs to run after response. Write it better?
-            thread.start()
-            logging.info("Broadcasting the current state of the blockchain.")
-            thread = threading.Thread(target=self.broadcast_blockchain)  # Thread because it needs to run after response.
-            thread.start()
+            print("<i should broadcast now>")
 
         return response.to_dict()
 
