@@ -6,7 +6,6 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives.serialization import load_pem_public_key
 from enum import Enum
-from IPython import embed
 
 from helper import dict_bytes, hash_dict, sha256hash
 import wallet

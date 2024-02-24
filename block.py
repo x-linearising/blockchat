@@ -57,11 +57,6 @@ def broadcast_block(validator_node, new_block):
 
     return
 
-# kathe node lambanei minima oti brethike o validator
-def validate_block(validator_node, new_block):
-
-    return
-
 if __name__ == "__main__":
     w = wallet.Wallet()
     t = TransactionBuilder(w)
