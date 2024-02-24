@@ -1,18 +1,19 @@
 import logging
 import argparse
+
 from flask import Flask
 from flask_restful import Api
-from controllers.bootstrap_controller import BootstrapController
-from node import Node, Bootstrap
-from constants import Constants
+from controllers.controller import BootstrapController, NodeController
 from helper import myIP
+
+app = Flask(__name__)
+api = Api(app)
+logging.basicConfig(level=logging.INFO)
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-b", "--bootstrap", action = argparse.BooleanOptionalAction, default = False)
 parser.add_argument("-p", "--port", nargs = "?", const = "8000", default = "8000")
 args = parser.parse_args()
-
-is_bootstrap = args.bootstrap
 
 print("-----------------------------------------------------------")
 print("""
@@ -25,30 +26,21 @@ print("""
 """)
 print("-----------------------------------------------------------")
 
-if is_bootstrap:
-    app = Flask(__name__)
-    api = Api(app)
-    logging.basicConfig(level=logging.INFO)
+# Set up node, basically its memory.
+controller = BootstrapController() if args.bootstrap else NodeController(myIP(), args.port)
 
-    # Set up node, basically its memory.
-    bootstrap = BootstrapController()
+# Add routes / endpoints.
+app.register_blueprint(controller.blueprint, url_prefix='/nodes')
 
-    # Add routes / endpoints.
-    app.register_blueprint(bootstrap.blueprint, url_prefix='/nodes')
-    
-    # Run the API
+app.run(host="0.0.0.0", port=args.port)
 
-    print(f"Bootstrap has joined the network.")
-    app.run(host="0.0.0.0", port=Constants.BOOTSTRAP_PORT)
-else:
-    ip_address = myIP() # TODO: Replace this maybe. Find it automatically?
-    node = Node(ip_address, args.port)
-    node.request_to_join_network_and_get_assigned_id()
-
+# TODO: Run cli in separate process
+try:
     while True:
-        print(f"[Node {node.id}] Enter your command:")
+        print(f"[Node {controller.node.id}] Enter your command:")
         line = input(">>> ")
-        node.execute_cmd(line)
+        controller.node.execute_cmd(line)
+except KeyboardInterrupt:
+    print("Shutting down app and cli.")
 
-    # TODO: node also listens on endpoints
-    # (maybe split the files to bootstrap_app and node_app for this)
+# (maybe split the files to bootstrap_app and node_app for this)
