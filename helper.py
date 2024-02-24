@@ -30,9 +30,15 @@ def sha256hash(data: bytes) -> bytes:
     digest.update(data)
     return digest.finalize()
 
+def dict_bytes(d: dict) -> bytes:
+    d_str = json.dumps(d)
+    d_bytes = struct.pack("!" + str(len(d_str)) + "s", bytes(d_str, "ascii"))
+    return d_bytes
 
-def string_to_bytes(string: str) -> bytes:
-    return struct.pack("!" + str(len(string)) + "s", bytes(string, "ascii"))
+def hash_dict(d: dict) -> bytes:
+    d_bytes = dict_bytes(d)
+    d_hash = sha256hash(d_bytes)
+    return d_hash
 
 
 def to_deep_dict(obj):

@@ -1,12 +1,14 @@
 import json
+import struct
 from base64 import b64encode, b64decode
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives.serialization import load_pem_public_key
 from enum import Enum
+from IPython import embed
 
-import helper
+from helper import dict_bytes, hash_dict, sha256hash
 import wallet
 from constants import Constants
 
@@ -14,16 +16,6 @@ from constants import Constants
 class TransactionType(Enum):
     AMOUNT = "a"
     MESSAGE = "m"
-
-
-class TransactionContents(helper.Hashable):
-    def __init__(self, sender_addr, recv_addr, trans_type, amount, message, nonce):
-        self.sender_addr = sender_addr
-        self.recv_addr = recv_addr
-        self.trans_type = trans_type
-        self.amount = amount
-        self.message = message
-        self.nonce = nonce
 
 
 class TransactionBuilder:
@@ -40,24 +32,30 @@ class TransactionBuilder:
         """
 
         if trans_type == TransactionType.MESSAGE.value:
-            payload = str(payload)
+            msg = str(payload)
+            amount = None
         else:
-            payload = float(payload)
+            msg = None
+            amount = float(payload)
 
-        tx_contents = TransactionContents(
-            self.sender_addr,
-            recv_addr,
-            trans_type,
-            payload if trans_type == TransactionType.AMOUNT.value else None,
-            payload if trans_type == TransactionType.MESSAGE.value else None,
-            self.nonce
-        )
+        tx_contents = {
+            "sender_addr": self.sender_addr,
+            "recv_addr": recv_addr,
+            "type": trans_type,
+            "amount": amount,
+            "message": msg,
+            "nonce": self.nonce,
+        }
 
-        tx_sign = self.wallet.sign(tx_contents.get_as_bytes())
+        tx_str = json.dumps(tx_contents)
+        tx_bytes = struct.pack("!" + str(len(tx_str)) + "s", bytes(tx_str, "ascii"))
+
+        tx_hash = sha256hash(tx_bytes)
+        tx_sign = self.wallet.sign(tx_bytes)
 
         tx = {
-            "contents": tx_contents.get_hashable_part_as_string(),
-            "hash": tx_contents.get_hash(),
+            "contents": tx_str,
+            "hash": b64encode(tx_hash).decode(),
             "sign": b64encode(tx_sign).decode()
         }
 
@@ -74,8 +72,8 @@ class TransactionBuilder:
 
 def verify_tx(tx: str) -> bool:
     tx = json.loads(tx)
-    tx_bytes = helper.string_to_bytes(tx["contents"])
-    my_hash = helper.sha256hash(tx_bytes)
+    tx_bytes = struct.pack("!" + str(len(tx["contents"])) + "s", bytes(tx["contents"], "ascii"))
+    my_hash = sha256hash(tx_bytes)
     tx["hash"] = b64decode(tx["hash"])
 
     if tx["hash"] != my_hash:
