@@ -31,6 +31,7 @@ def sha256hash(data: bytes) -> bytes:
     return digest.finalize()
 
 def dict_bytes(d: dict) -> bytes:
+    """ Converts a dict to bytes, forcing big-endian """
     d_str = json.dumps(d)
     d_bytes = struct.pack("!" + str(len(d_str)) + "s", bytes(d_str, "ascii"))
     return d_bytes

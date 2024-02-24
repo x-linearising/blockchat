@@ -10,16 +10,6 @@ from helper import Hashable, hash_dict, sha256hash
 from transaction import TransactionBuilder, verify_tx
 
 
-def create_hash(data):
-    # convert dictionary to json string
-    block_str = json.dumps(data)
-    # convert json to bytes and deal with endianness
-    block_bytes = struct.pack("!" + str(len(block_str)) + "s", bytes(block_str, "ascii"))
-    # create the sha256 hash of the block
-    block_hash = sha256hash(block_bytes)
-    # return
-    return b64encode(block_hash).decode()
-
 """
 Genesis block contains id=0, validator=0, previous_hash=1
 and is not validated!
