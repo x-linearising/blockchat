@@ -7,14 +7,14 @@ from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives.serialization import load_ssh_public_key
 from enum import Enum
 
-from helper import dict_bytes, hash_dict, sha256hash
+from helper import sha256hash
 import wallet
-from constants import Constants
 
 
 class TransactionType(Enum):
     AMOUNT = "a"
     MESSAGE = "m"
+    STAKE = "s"
 
 
 class TransactionBuilder:
@@ -27,7 +27,7 @@ class TransactionBuilder:
     def create(self, recv_addr: str, trans_type, payload):
         """
         if trans_type == "m", payload must be a string message
-        if trans_type == "a", payload must be a float amount 
+        if trans_type == "a" or "s", payload must be a float amount
         """
 
         if trans_type == TransactionType.MESSAGE.value:
@@ -95,7 +95,7 @@ def verify_tx(tx: str) -> bool:
 if __name__ == "__main__":
     w = wallet.Wallet()
     t = TransactionBuilder(w)
-    tx = t.create("some_addr", "a", 1337)
+    tx = t.create("some_addr", TransactionType.AMOUNT.value, 1337)
     res = verify_tx(tx)
     if res:
         print("Tx was verified!")
