@@ -103,10 +103,14 @@ class Node(NodeInfo):
 
         # Accept IDs instead of public keys as well.
         if recv.isdigit():
-            if self.other_nodes.get(int(recv)) is None:
+            if self.other_nodes.get(int(recv)) is None and int(recv) != self.id:
                 print(f"Specified Node [{int(recv)}] does not exist.")
                 return
-            recv = self.other_nodes[int(recv)].public_key
+            recv = self.other_nodes[int(recv)].public_key if int(recv) != self.id else self.public_key
+
+        if recv == self.public_key:
+            print("Cannot send transaction to sender.")
+            return
 
         # Verify sufficient wallet
         if type == TransactionType.MESSAGE.value:
@@ -117,9 +121,11 @@ class Node(NodeInfo):
             print(f"Transaction cannot proceed as the node does not have the required BCCs.")
             return
 
-        # Decrease balance
+        # Balance updates
         if type == TransactionType.AMOUNT.value:
             self.bcc -= transaction_cost
+            recv_id = self.get_node_id_by_public_key(recv)
+            self.other_nodes[recv_id].bcc += payload
             logging.info(f"Node's BCCs have been decreased to {self.bcc}.")
 
         tx_request = self.tx_builder.create(recv, type, payload)
@@ -133,6 +139,9 @@ class Node(NodeInfo):
 
     def balance(self):
         print(f"[Stub Method] Node {self.id} views its balance")
+
+        # TODO: This is temporary for testing. To be altered.
+        print(f"BCCs: {[(node_id, node.bcc) for node_id, node in self.other_nodes.items()]}. Self BCC: {self.bcc}.")
 
     def execute_cmd(self, line: str):
         # remove leading whitespace, if any

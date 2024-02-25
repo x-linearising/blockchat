@@ -54,9 +54,15 @@ class NodeController:
 
         # BCCs and transaction list updates
         sender_info.bcc -= transaction_cost
-        if tx_contents["recv_addr"] == self.node.public_key and tx_contents["type"] == TransactionType.AMOUNT.value:
-            self.node.bcc += tx_contents["amount"]
-            logging.info(f"Node's BCCs have increased to [{self.node.bcc}].")
+        if tx_contents["type"] == TransactionType.AMOUNT.value:
+            if tx_contents["recv_addr"] == self.node.public_key:
+                self.node.bcc += tx_contents["amount"]
+                logging.info(f"Node's BCCs have increased to [{self.node.bcc}].")
+            else:
+                recv_id = self.node.get_node_id_by_public_key(tx_contents["recv_addr"])
+                self.node.other_nodes[recv_id].bcc += tx_contents["amount"]
+                logging.info(f"BCCs of node {recv_id} have increased to [{self.node.other_nodes[recv_id].bcc}].")
+
         self.node.transactions.append(transaction_as_dict)
         # TODO: Check if capacity reached on separate thread.
         logging.warning("Capacity checks have not been implemented yet!")
