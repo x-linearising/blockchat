@@ -41,6 +41,28 @@ def hash_dict(d: dict) -> bytes:
     d_hash = sha256hash(d_bytes)
     return d_hash
 
+def tx_str(tx, summarized=True, indent=1):
+    tabs = indent * "\t"
+    s = tabs + "hash: {}\n".format(tx["hash"])
+    if summarized:
+        s += tabs + "sign: ...{}...\n".format(tx["sign"][100:110]) 
+        s += tabs + "sender_addr: ...{}...\n".format(tx["contents"]["sender_addr"][100:110])
+    else:   
+        s += tabs + "sign: {}\n".format(tx["sign"])
+        s += tabs + "sender_addr: {}\n".format(tx["contents"]["sender_addr"])
+    
+    # TODO: CHANGE THIS WHEN A CONSTANT, KNOWN PUBLIC KEY
+    # IS DEFINED FOR THE BOOTSTRAP NODE IN CONSTANTS!
+    if False:
+        s += tabs + "recv_addr: ...{}...\n".format(tx["contents"]["recv_addr"][100:110])
+    else:
+        s += tabs + "recv_addr: {}\n".format(tx["contents"]["recv_addr"])
+    s += tabs + "type: {}\n".format(tx["contents"]["type"])
+    s += tabs + "amount: {}\n".format(tx["contents"]["amount"])
+    s += tabs + "message: {}\n".format(tx["contents"]["message"])
+    s += tabs + "nonce: {}\n".format(tx["contents"]["nonce"])
+    return s
+
 
 def to_deep_dict(obj):
     if isinstance(obj, dict):

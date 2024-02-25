@@ -6,7 +6,7 @@ from cryptography.hazmat.primitives import hashes
 import PoS
 from constants import Constants
 import wallet
-from helper import Hashable, hash_dict, sha256hash
+from helper import tx_str, hash_dict, sha256hash
 from transaction import TransactionBuilder, verify_tx
 
 
@@ -52,24 +52,7 @@ class Block():
         s += tabs + f"transactions: [\n"
         
         for tx in self.transactions:
-            s += tabs + "\thash: {}\n".format(tx["hash"])
-            if summarized:
-                s += tabs + "\tsign: ...{}...\n".format(tx["sign"][100:110]) 
-                s += tabs + "\tsender_addr: ...{}...\n".format(tx["contents"]["sender_addr"][100:110])
-            else:   
-                s += tabs + "\tsign: {}\n".format(tx["sign"])
-                s += tabs + "\tsender_addr: {}\n".format(tx["contents"]["sender_addr"])
-            
-            # TODO: CHANGE THIS WHEN A CONSTANT, KNOWN PUBLIC KEY
-            # IS DEFINED FOR THE BOOTSTRAP NODE IN CONSTANTS!
-            if False:
-                s += tabs + "\trecv_addr: ...{}...\n".format(tx["contents"]["recv_addr"][100:110])
-            else:
-                s += tabs + "\trecv_addr: {}\n".format(tx["contents"]["recv_addr"])
-            s += tabs + "\ttype: {}\n".format(tx["contents"]["type"])
-            s += tabs + "\tamount: {}\n".format(tx["contents"]["amount"])
-            s += tabs + "\tmessage: {}\n".format(tx["contents"]["message"])
-            s += tabs + "\tnonce: {}\n".format(tx["contents"]["nonce"])
+            s += tx_str(tx, summarized, indent+1)
         s += tabs + "]"
         return s
 
