@@ -47,7 +47,7 @@ class NodeController:
             case TransactionType.AMOUNT.value:
                 transaction_cost = tx_contents["amount"] * Constants.TRANSFER_FEE_MULTIPLIER
             case TransactionType.STAKE.value:
-                transaction_cost = tx_contents["amount"]
+                transaction_cost = tx_contents["amount"] - self.node.stakes[sender_id]  # This could be very well be negative
             case _:
                 logging.warning("Invalid transaction type was detected.")
                 return "Invalid transaction type", 400
@@ -62,8 +62,6 @@ class NodeController:
         # BCCs and transaction list updates
         sender_info.bcc -= transaction_cost
         if tx_contents["type"] == TransactionType.STAKE.value:
-            # Revoke previous stakes and set new
-            sender_info.bcc += self.node.stakes[sender_id]
             self.node.stakes[sender_id] = tx_contents["amount"]
         if tx_contents["type"] == TransactionType.AMOUNT.value:
             if tx_contents["recv_addr"] == self.node.public_key:

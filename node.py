@@ -127,7 +127,7 @@ class Node(NodeInfo):
             case TransactionType.AMOUNT.value:
                 transaction_cost = payload * Constants.TRANSFER_FEE_MULTIPLIER
             case TransactionType.STAKE.value:
-                transaction_cost = payload
+                transaction_cost = payload - self.stakes[self.id]
             case _:
                 print("Invalid transaction type.")
                 return
@@ -142,10 +142,8 @@ class Node(NodeInfo):
             self.other_nodes[recv_id].bcc += payload
             logging.info(f"Node's BCCs have been decreased to {self.bcc}.")
         elif type == TransactionType.STAKE.value:
-            old_stake = self.stakes[self.id]
-            new_stake = payload
-            self.bcc = self.bcc + old_stake - new_stake
-            self.stakes[self.id] = new_stake
+            self.bcc -= transaction_cost
+            self.stakes[self.id] = payload
 
         tx_request = self.tx_builder.create(recv, type, payload)
         self.broadcast_request(tx_request, "/transactions")
