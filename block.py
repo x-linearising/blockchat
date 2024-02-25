@@ -2,9 +2,8 @@ import time
 from base64 import b64encode
 import PoS
 import wallet
-from helper import hash_dict
+from helper import tx_str, hash_dict, sha256hash
 from transaction import TransactionBuilder, verify_tx, TransactionType
-
 
 class Block():
     def __init__(self, idx, timestamp, transactions, validator, prev_hash, block_hash=None):
@@ -33,6 +32,25 @@ class Block():
                 "validator": self.validator,
                 "transactions": self.transactions
             }
+
+    def to_str(self, summarized=True, indent=1):
+        tabs = indent * "\t"
+        s = tabs + f"prev hash: {self.prev_hash}\n"
+        s += tabs + f"hash: {self.block_hash}\n"
+        s += tabs +  f"index: {self.idx}\n"
+        s += tabs +  f"timestamp: {self.timestamp}\n"
+        if summarized:
+            s += tabs + f"validator: ...{self.validator[100:110]}...\n"
+        else:
+            s += tabs + f"validator: {self.validator}\n"
+        
+        s += tabs + f"transactions: [\n"
+        
+        for tx in self.transactions:
+            s += tx_str(tx, summarized, indent+1)
+        s += tabs + "]"
+        return s
+
 
     def hash(self):
         return hash_dict(self.contents())

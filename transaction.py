@@ -4,7 +4,7 @@ from base64 import b64encode, b64decode
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding
-from cryptography.hazmat.primitives.serialization import load_pem_public_key
+from cryptography.hazmat.primitives.serialization import load_ssh_public_key
 from enum import Enum
 
 from helper import sha256hash
@@ -73,7 +73,7 @@ def verify_tx(tx: str) -> bool:
         return False
 
     tx["contents"] = json.loads(tx["contents"])
-    sender_pubkey = load_pem_public_key(bytes(tx["contents"]["sender_addr"], "ascii"))
+    sender_pubkey = load_ssh_public_key(bytes(tx["contents"]["sender_addr"], "ascii"))
     sign = b64decode(tx["sign"])
 
     try:

@@ -153,7 +153,8 @@ class Node(NodeInfo):
         self.create_tx(str(Constants.BOOTSTRAP_ID), TransactionType.STAKE.value, amount)
 
     def view_block(self):
-        print(f"[Stub Method] Node {self.id} views the last block")
+        print("Last validated block:")
+        print(self.blockchain.blocks[-1].to_str())
 
     def balance(self):
         print(f"[Stub Method] Node {self.id} views its balance")

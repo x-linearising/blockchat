@@ -110,10 +110,11 @@ class NodeController:
         Endpoint hit by the bootstrap node, who sends the blockchain after bootstrap phase is complete.
         """
 
-        logging.info(f"Received initial state of blockchain.")
+        logging.info(f"Received initial state of blockchain:")
 
         # Mapping request body to class
         blocks = BlockchainRequest.from_request_to_blocks(request.json)
+        print(blocks[0].to_str())
 
         # Updating node list
         self.node.blockchain.blocks = blocks
