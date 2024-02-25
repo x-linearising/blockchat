@@ -1,4 +1,10 @@
+import json
+import struct
+from base64 import b64encode
 from socket import gethostname, gethostbyname
+
+from cryptography.hazmat.primitives import hashes
+
 
 class JSONSerializable:
     """
@@ -17,3 +23,53 @@ def myIP():
     # no problem when running locally, but we don't want our online nodes to believe
     # 127.0.0.1 is their IP
     return gethostbyname(gethostname())
+
+
+def sha256hash(data: bytes) -> bytes:
+    digest = hashes.Hash(hashes.SHA256())
+    digest.update(data)
+    return digest.finalize()
+
+def dict_bytes(d: dict) -> bytes:
+    """ Converts a dict to bytes, forcing big-endian """
+    d_str = json.dumps(d)
+    d_bytes = struct.pack("!" + str(len(d_str)) + "s", bytes(d_str, "ascii"))
+    return d_bytes
+
+def hash_dict(d: dict) -> bytes:
+    d_bytes = dict_bytes(d)
+    d_hash = sha256hash(d_bytes)
+    return d_hash
+
+
+def to_deep_dict(obj):
+    if isinstance(obj, dict):
+        return {k: to_deep_dict(v) for k, v in obj.items()}
+    elif hasattr(obj, '__dict__'):
+        return to_deep_dict(vars(obj))
+    elif isinstance(obj, list):
+        return [to_deep_dict(item) for item in obj]
+    else:
+        return obj
+
+# TODO: Make these methods, instead of class.
+class Hashable:
+    # Could make a constructor that initializes hash.
+
+    def get_as_bytes(self) -> bytes:
+        return string_to_bytes(self.get_hashable_part_as_string())
+
+    def get_hashable_part_as_string(self) -> str:
+        return json.dumps(self.get_hashable_part_as_dict())
+
+    def get_hash(self):
+        return b64encode(sha256hash(self.get_as_bytes())).decode()
+
+    def get_hashable_part_as_dict(self):
+        return to_deep_dict(self)
+
+
+
+
+
+

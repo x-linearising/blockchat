@@ -9,5 +9,6 @@ class Constants:
     MAX_NODES = 3
     JSON_HEADER = {'Content-Type': 'application/json'}
     CAPACITY = 5
+    STARTING_BCC_PER_NODE = 1000
     BOOTSTRAP_URL = f"http://{BOOTSTRAP_IP_ADDRESS}:{BOOTSTRAP_PORT}"
 
