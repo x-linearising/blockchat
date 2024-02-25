@@ -39,6 +39,14 @@ class Node(NodeInfo):
         self.stakes = {}
         self.blockchain = Blockchain()
 
+    def initialize_stakes(self):
+        self.stakes[self.id] = Constants.INITIAL_STAKE
+        self.bcc -= Constants.INITIAL_STAKE
+        for node_id, node_info in self.other_nodes.items():
+            self.stakes[node_id] = Constants.INITIAL_STAKE
+            self.other_nodes[node_id].bcc -= Constants.INITIAL_STAKE
+        return self.stakes
+
     def get_node_info_by_public_key(self, public_key):
         for node_info in self.other_nodes.values():
             if node_info.public_key == public_key:
@@ -108,15 +116,21 @@ class Node(NodeInfo):
                 return
             recv = self.other_nodes[int(recv)].public_key if int(recv) != self.id else self.public_key
 
-        if recv == self.public_key:
+        if recv == self.public_key and type != TransactionType.STAKE.value:
             print("Cannot send transaction to sender.")
             return
 
         # Verify sufficient wallet
-        if type == TransactionType.MESSAGE.value:
-            transaction_cost = len(payload)
-        else:
-            transaction_cost = payload * Constants.TRANSFER_FEE_MULTIPLIER
+        match type:
+            case TransactionType.MESSAGE.value:
+                transaction_cost = len(payload)
+            case TransactionType.AMOUNT.value:
+                transaction_cost = payload * Constants.TRANSFER_FEE_MULTIPLIER
+            case TransactionType.STAKE.value:
+                transaction_cost = payload - self.stakes[self.id]
+            case _:
+                print("Invalid transaction type.")
+                return
         if transaction_cost > self.bcc:
             print(f"Transaction cannot proceed as the node does not have the required BCCs.")
             return
@@ -127,12 +141,16 @@ class Node(NodeInfo):
             recv_id = self.get_node_id_by_public_key(recv)
             self.other_nodes[recv_id].bcc += payload
             logging.info(f"Node's BCCs have been decreased to {self.bcc}.")
+        elif type == TransactionType.STAKE.value:
+            self.bcc -= transaction_cost
+            self.stakes[self.id] = payload
 
         tx_request = self.tx_builder.create(recv, type, payload)
         self.broadcast_request(tx_request, "/transactions")
 
     def stake(self, amount):
         print(f"[Stub Method] Node {self.id} stakes {amount}")
+        self.create_tx(str(Constants.BOOTSTRAP_ID), TransactionType.STAKE.value, amount)
 
     def view_block(self):
         print(f"[Stub Method] Node {self.id} views the last block")
@@ -141,32 +159,35 @@ class Node(NodeInfo):
         print(f"[Stub Method] Node {self.id} views its balance")
 
         # TODO: This is temporary for testing. To be altered.
+        print(f"Stakes: {[(id, stake) for id, stake in self.stakes.items()]}.")
         print(f"BCCs: {[(node_id, node.bcc) for node_id, node in self.other_nodes.items()]}. Self BCC: {self.bcc}.")
 
     def execute_cmd(self, line: str):
-        # remove leading whitespace, if any
-        line = line.lstrip()
-        if line.startswith("t "):
-            items = line.split(" ")
-            try:
-                amount = float(items[2])
-                self.create_tx(items[1], TransactionType.AMOUNT.value, amount)
-            except ValueError:
-                self.create_tx(items[1], TransactionType.MESSAGE.value, items[2])
-        elif line.startswith("stake "):
-            items = line.split(" ")
-            try:
-                amount = float(items[1])
-                self.stake(amount)
-            except ValueError:
-                print("[Error] Stake amount must be a number!")
-        elif line == "view":
-            self.view_block()
-        elif line == "balance":
-            self.balance()
-        elif line == "help":
-            print("<help shown here>")
-        else:
-            print("Invalid Command! You can view valid commands with \'help\'")
+        # lstrip to remove leading whitespace, if any
+        items = line.lstrip().split(" ")
+        command_name = items[0]
+        match command_name:
+            case "t":
+                try:
+                    amount = float(items[2])
+                    self.create_tx(items[1], TransactionType.AMOUNT.value, amount)
+                except ValueError:
+                    self.create_tx(items[1], TransactionType.MESSAGE.value, items[2])
+                except IndexError:
+                    print("[Error] Transaction amount was not provided!")
+            case "stake":
+                try:
+                    amount = float(items[1])
+                    self.stake(amount)
+                except ValueError:
+                    print("[Error] Stake amount must be a number!")
+            case "view":
+                self.view_block()
+            case "balance":
+                self.balance()
+            case  "help":
+                print("<help shown here>")
+            case _:
+                print("Invalid Command! You can view valid commands with \'help\'")
 
 

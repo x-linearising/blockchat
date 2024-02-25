@@ -36,14 +36,21 @@ class NodeController:
         tx_contents = json.loads(transaction_as_dict["contents"])
         sender_public_key = tx_contents["sender_addr"]
         sender_info = self.node.get_node_info_by_public_key(sender_public_key)
+        sender_id = self.node.get_node_id_by_public_key(sender_public_key)
 
-        logging.info(f"Received transaction from Node {self.node.get_node_id_by_public_key(sender_public_key)}.")
+        logging.info(f"Received transaction from Node {sender_id}.")
 
         # Transaction Cost
-        if tx_contents["type"] == TransactionType.MESSAGE.value:
-            transaction_cost = len(tx_contents["message"])
-        else:
-            transaction_cost = tx_contents["amount"] * Constants.TRANSFER_FEE_MULTIPLIER
+        match tx_contents["type"]:
+            case TransactionType.MESSAGE.value:
+                transaction_cost = len(tx_contents["message"])
+            case TransactionType.AMOUNT.value:
+                transaction_cost = tx_contents["amount"] * Constants.TRANSFER_FEE_MULTIPLIER
+            case TransactionType.STAKE.value:
+                transaction_cost = tx_contents["amount"] - self.node.stakes[sender_id]  # This could be very well be negative
+            case _:
+                logging.warning("Invalid transaction type was detected.")
+                return "Invalid transaction type", 400
 
         # Transaction validations
         if not verify_tx(transaction_as_string):
@@ -54,6 +61,8 @@ class NodeController:
 
         # BCCs and transaction list updates
         sender_info.bcc -= transaction_cost
+        if tx_contents["type"] == TransactionType.STAKE.value:
+            self.node.stakes[sender_id] = tx_contents["amount"]
         if tx_contents["type"] == TransactionType.AMOUNT.value:
             if tx_contents["recv_addr"] == self.node.public_key:
                 self.node.bcc += tx_contents["amount"]
@@ -89,6 +98,9 @@ class NodeController:
         for node_info in self.node.other_nodes.values():
             node_info.bcc = Constants.STARTING_BCC_PER_NODE
         self.node.bcc = Constants.STARTING_BCC_PER_NODE
+
+        # Initialize stakes at predefined value
+        self.node.initialize_stakes()
 
         # No need for response body. Responding with status 200.
         return '', 200
@@ -132,6 +144,7 @@ class BootstrapController(NodeController):
                 print("[Poll Thread] Bootstrap phase over. Broadcasting...")
                 self.node.broadcast_node_list()
                 self.node.broadcast_blockchain()
+                self.node.initialize_stakes()
                 return
             else:
                 sleep(1)
