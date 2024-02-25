@@ -114,7 +114,11 @@ class Node(NodeInfo):
             if self.other_nodes.get(int(recv)) is None and int(recv) != self.id:
                 print(f"Specified Node [{int(recv)}] does not exist.")
                 return
-            recv = self.other_nodes[int(recv)].public_key if int(recv) != self.id else self.id
+            recv = self.other_nodes[int(recv)].public_key if int(recv) != self.id else self.public_key
+
+        if recv == self.public_key and type != TransactionType.STAKE.value:
+            print("Cannot send transaction to sender.")
+            return
 
         # Verify sufficient wallet
         match type:
@@ -156,7 +160,7 @@ class Node(NodeInfo):
     def balance(self):
         print(f"[Stub Method] Node {self.id} views its balance")
 
-        # TODO: This is temporary for testing. To be removed.
+        # TODO: This is temporary for testing. To be altered.
         print(f"Stakes: {[(id, stake) for id, stake in self.stakes.items()]}.")
         print(f"BCCs: {[(node_id, node.bcc) for node_id, node in self.other_nodes.items()]}. Self BCC: {self.bcc}.")
 
