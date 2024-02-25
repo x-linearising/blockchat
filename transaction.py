@@ -14,6 +14,7 @@ import wallet
 class TransactionType(Enum):
     AMOUNT = "a"
     MESSAGE = "m"
+    STAKE = "s"
 
 
 class TransactionBuilder:
@@ -26,7 +27,7 @@ class TransactionBuilder:
     def create(self, recv_addr: str, trans_type, payload):
         """
         if trans_type == "m", payload must be a string message
-        if trans_type == "a", payload must be a float amount 
+        if trans_type == "a" or "s", payload must be a float amount
         """
 
         if trans_type == TransactionType.MESSAGE.value:

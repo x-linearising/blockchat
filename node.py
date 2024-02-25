@@ -39,6 +39,14 @@ class Node(NodeInfo):
         self.stakes = {}
         self.blockchain = Blockchain()
 
+    def initialize_stakes(self):
+        self.stakes[self.id] = Constants.INITIAL_STAKE
+        self.bcc -= Constants.INITIAL_STAKE
+        for node_id, node_info in self.other_nodes.items():
+            self.stakes[node_id] = Constants.INITIAL_STAKE
+            self.other_nodes[node_id].bcc -= Constants.INITIAL_STAKE
+        return self.stakes
+
     def get_node_info_by_public_key(self, public_key):
         for node_info in self.other_nodes.values():
             if node_info.public_key == public_key:
@@ -103,36 +111,54 @@ class Node(NodeInfo):
 
         # Accept IDs instead of public keys as well.
         if recv.isdigit():
-            if self.other_nodes.get(int(recv)) is None:
+            if self.other_nodes.get(int(recv)) is None and int(recv) != self.id:
                 print(f"Specified Node [{int(recv)}] does not exist.")
                 return
-            recv = self.other_nodes[int(recv)].public_key
+            recv = self.other_nodes[int(recv)].public_key if int(recv) != self.id else self.id
 
         # Verify sufficient wallet
-        if type == TransactionType.MESSAGE.value:
-            transaction_cost = len(payload)
-        else:
-            transaction_cost = payload * Constants.TRANSFER_FEE_MULTIPLIER
+        match type:
+            case TransactionType.MESSAGE.value:
+                transaction_cost = len(payload)
+            case TransactionType.AMOUNT.value:
+                transaction_cost = payload * Constants.TRANSFER_FEE_MULTIPLIER
+            case TransactionType.STAKE.value:
+                transaction_cost = payload
+            case _:
+                print("Invalid transaction type.")
+                return
         if transaction_cost > self.bcc:
             print(f"Transaction cannot proceed as the node does not have the required BCCs.")
             return
 
-        # Decrease balance
+        # Balance updates
         if type == TransactionType.AMOUNT.value:
             self.bcc -= transaction_cost
+            recv_id = self.get_node_id_by_public_key(recv)
+            self.other_nodes[recv_id].bcc += payload
             logging.info(f"Node's BCCs have been decreased to {self.bcc}.")
+        elif type == TransactionType.STAKE.value:
+            old_stake = self.stakes[self.id]
+            new_stake = payload
+            self.bcc = self.bcc + old_stake - new_stake
+            self.stakes[self.id] = new_stake
 
         tx_request = self.tx_builder.create(recv, type, payload)
         self.broadcast_request(tx_request, "/transactions")
 
     def stake(self, amount):
         print(f"[Stub Method] Node {self.id} stakes {amount}")
+        self.create_tx(str(Constants.BOOTSTRAP_ID), TransactionType.STAKE.value, amount)
 
     def view_block(self):
         print(f"[Stub Method] Node {self.id} views the last block")
 
     def balance(self):
         print(f"[Stub Method] Node {self.id} views its balance")
+
+        # TODO: This is temporary for testing. To be removed.
+        print(f"Stakes: {[(id, stake) for id, stake in self.stakes.items()]}.")
+        print(f"BCCs: {[(node_id, node.bcc) for node_id, node in self.other_nodes.items()]}. Self BCC: {self.bcc}.")
 
     def execute_cmd(self, line: str):
         # remove leading whitespace, if any
