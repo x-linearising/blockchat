@@ -1,13 +1,9 @@
 import time
-import json
-import struct
 from base64 import b64encode
-from cryptography.hazmat.primitives import hashes
 import PoS
-from constants import Constants
 import wallet
-from helper import Hashable, hash_dict, sha256hash
-from transaction import TransactionBuilder, verify_tx
+from helper import hash_dict
+from transaction import TransactionBuilder, verify_tx, TransactionType
 
 
 class Block():
@@ -70,7 +66,7 @@ def broadcast_block(validator_node, new_block):
 if __name__ == "__main__":
     w = wallet.Wallet()
     t = TransactionBuilder(w)
-    tx = t.create("some_addr", "a", 1337)
+    tx = t.create("some_addr", TransactionType.AMOUNT.value, 1337)
     res = verify_tx(tx)
     if res:
         print("Tx was verified!")

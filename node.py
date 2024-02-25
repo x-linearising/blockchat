@@ -1,13 +1,15 @@
 import logging
+import time
 
 import requests
 
+from block import Block
 from blockchain import Blockchain
 from constants import Constants
 from request_classes.join_request import JoinRequest
 from response_classes.join_response import JoinResponse
 from wallet import Wallet
-from transaction import TransactionBuilder
+from transaction import TransactionBuilder, TransactionType
 
 
 class NodeInfo:
@@ -25,7 +27,7 @@ class NodeInfo:
 class Node(NodeInfo):
     def __init__(self, ip_address, port, node_id=None):
         self.wallet = Wallet()
-        self.other_nodes = {}
+        self.other_nodes: dict[int, NodeInfo] = {}
         self.tx_builder = TransactionBuilder(self.wallet)
         super().__init__(ip_address, port, self.wallet.public_key)
         if node_id is None:
@@ -37,6 +39,15 @@ class Node(NodeInfo):
         self.stakes = {}
         self.blockchain = Blockchain()
 
+    def get_node_info_by_public_key(self, public_key):
+        for node_info in self.other_nodes.values():
+            if node_info.public_key == public_key:
+                return node_info
+
+    def get_node_id_by_public_key(self, public_key):
+        for node_id, node_info in self.other_nodes.items():
+            if node_info.public_key == public_key:
+                return node_id
 
     def join_network(self):
         """
@@ -90,6 +101,36 @@ class Node(NodeInfo):
     def create_tx(self, recv, type, payload):
         print(f"[Stub Method] Node {self.id} sends a transaction")
 
+        # Accept IDs instead of public keys as well.
+        if recv.isdigit():
+            if self.other_nodes.get(int(recv)) is None and int(recv) != self.id:
+                print(f"Specified Node [{int(recv)}] does not exist.")
+                return
+            recv = self.other_nodes[int(recv)].public_key if int(recv) != self.id else self.public_key
+
+        if recv == self.public_key:
+            print("Cannot send transaction to sender.")
+            return
+
+        # Verify sufficient wallet
+        if type == TransactionType.MESSAGE.value:
+            transaction_cost = len(payload)
+        else:
+            transaction_cost = payload * Constants.TRANSFER_FEE_MULTIPLIER
+        if transaction_cost > self.bcc:
+            print(f"Transaction cannot proceed as the node does not have the required BCCs.")
+            return
+
+        # Balance updates
+        if type == TransactionType.AMOUNT.value:
+            self.bcc -= transaction_cost
+            recv_id = self.get_node_id_by_public_key(recv)
+            self.other_nodes[recv_id].bcc += payload
+            logging.info(f"Node's BCCs have been decreased to {self.bcc}.")
+
+        tx_request = self.tx_builder.create(recv, type, payload)
+        self.broadcast_request(tx_request, "/transactions")
+
     def stake(self, amount):
         print(f"[Stub Method] Node {self.id} stakes {amount}")
 
@@ -99,6 +140,9 @@ class Node(NodeInfo):
     def balance(self):
         print(f"[Stub Method] Node {self.id} views its balance")
 
+        # TODO: This is temporary for testing. To be altered.
+        print(f"BCCs: {[(node_id, node.bcc) for node_id, node in self.other_nodes.items()]}. Self BCC: {self.bcc}.")
+
     def execute_cmd(self, line: str):
         # remove leading whitespace, if any
         line = line.lstrip()
@@ -106,9 +150,9 @@ class Node(NodeInfo):
             items = line.split(" ")
             try:
                 amount = float(items[2])
-                self.create_tx(items[1], "a", amount)
+                self.create_tx(items[1], TransactionType.AMOUNT.value, amount)
             except ValueError:
-                self.create_tx(items[1], "m", items[2])
+                self.create_tx(items[1], TransactionType.MESSAGE.value, items[2])
         elif line.startswith("stake "):
             items = line.split(" ")
             try:

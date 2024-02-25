@@ -1,16 +1,17 @@
+import json
 import logging
-import requests
 from threading import Thread
 from time import sleep
 from flask import Blueprint, abort, request
 
-from node import NodeInfo, Node
+from node import Node
 from bootstrap import Bootstrap
 from request_classes.blockchain_request import BlockchainRequest
 from request_classes.node_list_request import NodeListRequest
 from request_classes.join_request import JoinRequest
 from response_classes.join_response import JoinResponse
-from constants import Constants 
+from constants import Constants
+from transaction import verify_tx, TransactionType
 
 
 class NodeController:
@@ -21,7 +22,52 @@ class NodeController:
         # (which wouldn't work because of the self prefix)
         self.blueprint.add_url_rule("/nodes", "nodes", self.set_final_node_list, methods=["POST"])
         self.blueprint.add_url_rule("/blockchain", "blockchain", self.set_initial_blockchain, methods=["POST"])
+        self.blueprint.add_url_rule("/transactions", "transaction", self.receive_transaction, methods=["POST"])
         self.node = Node(ip_address, port)
+
+    def receive_transaction(self):
+        """
+        Endpoint hit by a node broadcasting a transaction.
+        """
+
+        # Extracting information from request
+        transaction_as_string = request.json
+        transaction_as_dict = json.loads(transaction_as_string)
+        tx_contents = json.loads(transaction_as_dict["contents"])
+        sender_public_key = tx_contents["sender_addr"]
+        sender_info = self.node.get_node_info_by_public_key(sender_public_key)
+
+        logging.info(f"Received transaction from Node {self.node.get_node_id_by_public_key(sender_public_key)}.")
+
+        # Transaction Cost
+        if tx_contents["type"] == TransactionType.MESSAGE.value:
+            transaction_cost = len(tx_contents["message"])
+        else:
+            transaction_cost = tx_contents["amount"] * Constants.TRANSFER_FEE_MULTIPLIER
+
+        # Transaction validations
+        if not verify_tx(transaction_as_string):
+            return "Invalid signature.", 400
+        if transaction_cost > sender_info.bcc:   # Stakes are not contained in bcc attribute.
+            logging.warning("Transaction is not valid as node's amount is not sufficient.")
+            return "Not enough bcc to carry out transaction.", 400
+
+        # BCCs and transaction list updates
+        sender_info.bcc -= transaction_cost
+        if tx_contents["type"] == TransactionType.AMOUNT.value:
+            if tx_contents["recv_addr"] == self.node.public_key:
+                self.node.bcc += tx_contents["amount"]
+                logging.info(f"Node's BCCs have increased to [{self.node.bcc}].")
+            else:
+                recv_id = self.node.get_node_id_by_public_key(tx_contents["recv_addr"])
+                self.node.other_nodes[recv_id].bcc += tx_contents["amount"]
+                logging.info(f"BCCs of node {recv_id} have increased to [{self.node.other_nodes[recv_id].bcc}].")
+
+        self.node.transactions.append(transaction_as_dict)
+        # TODO: Check if capacity reached on separate thread.
+        logging.warning("Capacity checks have not been implemented yet!")
+
+        return '', 200
 
     def set_final_node_list(self):
         """
@@ -38,6 +84,11 @@ class NodeController:
         # Updating node list
         self.node.other_nodes = nodes_info
         logging.info("Node list has been updated successfully.")
+
+        # TODO: Remove this after adding blockchain validation? BCCs can be calculated from there.
+        for node_info in self.node.other_nodes.values():
+            node_info.bcc = Constants.STARTING_BCC_PER_NODE
+        self.node.bcc = Constants.STARTING_BCC_PER_NODE
 
         # No need for response body. Responding with status 200.
         return '', 200
@@ -71,6 +122,7 @@ class BootstrapController(NodeController):
         # equivalent to using @self.blueprint.route on add_node
         # (which wouldn't work because of the self prefix)
         self.blueprint.add_url_rule("/nodes", "nodes", self.add_node, methods=["POST"])
+        self.blueprint.add_url_rule("/transactions", "transactions", self.receive_transaction, methods=["POST"])
         t = Thread(target=self.poll_node_count)
         t.start()
 

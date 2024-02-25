@@ -7,9 +7,8 @@ from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives.serialization import load_pem_public_key
 from enum import Enum
 
-from helper import dict_bytes, hash_dict, sha256hash
+from helper import sha256hash
 import wallet
-from constants import Constants
 
 
 class TransactionType(Enum):
@@ -95,7 +94,7 @@ def verify_tx(tx: str) -> bool:
 if __name__ == "__main__":
     w = wallet.Wallet()
     t = TransactionBuilder(w)
-    tx = t.create("some_addr", "a", 1337)
+    tx = t.create("some_addr", TransactionType.AMOUNT.value, 1337)
     res = verify_tx(tx)
     if res:
         print("Tx was verified!")
