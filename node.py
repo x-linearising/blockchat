@@ -163,29 +163,31 @@ class Node(NodeInfo):
         print(f"BCCs: {[(node_id, node.bcc) for node_id, node in self.other_nodes.items()]}. Self BCC: {self.bcc}.")
 
     def execute_cmd(self, line: str):
-        # remove leading whitespace, if any
-        line = line.lstrip()
-        if line.startswith("t "):
-            items = line.split(" ")
-            try:
-                amount = float(items[2])
-                self.create_tx(items[1], TransactionType.AMOUNT.value, amount)
-            except ValueError:
-                self.create_tx(items[1], TransactionType.MESSAGE.value, items[2])
-        elif line.startswith("stake "):
-            items = line.split(" ")
-            try:
-                amount = float(items[1])
-                self.stake(amount)
-            except ValueError:
-                print("[Error] Stake amount must be a number!")
-        elif line == "view":
-            self.view_block()
-        elif line == "balance":
-            self.balance()
-        elif line == "help":
-            print("<help shown here>")
-        else:
-            print("Invalid Command! You can view valid commands with \'help\'")
+        # lstrip to remove leading whitespace, if any
+        items = line.lstrip().split(" ")
+        command_name = items[0]
+        match command_name:
+            case "t":
+                try:
+                    amount = float(items[2])
+                    self.create_tx(items[1], TransactionType.AMOUNT.value, amount)
+                except ValueError:
+                    self.create_tx(items[1], TransactionType.MESSAGE.value, items[2])
+                except IndexError:
+                    print("[Error] Transaction amount was not provided!")
+            case "stake":
+                try:
+                    amount = float(items[1])
+                    self.stake(amount)
+                except ValueError:
+                    print("[Error] Stake amount must be a number!")
+            case "view":
+                self.view_block()
+            case "balance":
+                self.balance()
+            case  "help":
+                print("<help shown here>")
+            case _:
+                print("Invalid Command! You can view valid commands with \'help\'")
 
 
