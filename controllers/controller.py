@@ -39,24 +39,27 @@ class NodeController:
 
         logging.info(f"Received transaction from Node {self.node.get_node_id_by_public_key(sender_public_key)}.")
 
-        if not verify_tx(transaction_as_string):
-            return "Invalid signature.", 400
-
+        # Transaction Cost
         if tx_contents["type"] == TransactionType.MESSAGE.value:
             transaction_cost = len(tx_contents["message"])
         else:
             transaction_cost = tx_contents["amount"] * Constants.TRANSFER_FEE_MULTIPLIER
 
+        # Transaction validations
+        if not verify_tx(transaction_as_string):
+            return "Invalid signature.", 400
         if transaction_cost > sender_info.bcc:   # Stakes are not contained in bcc attribute.
             logging.warning("Transaction is not valid as node's amount is not sufficient.")
             return "Not enough bcc to carry out transaction.", 400
-        else:
-            sender_info.bcc -= transaction_cost
-            if tx_contents["recv_addr"] == self.node.public_key:
-                self.node.bcc += transaction_cost
-            self.node.transactions.append(transaction_as_dict)
-            # TODO: Check if capacity reached on separate thread.
-            logging.warning("Capacity checks have not been implemented yet!")
+
+        # BCCs and transaction list updates
+        sender_info.bcc -= transaction_cost
+        if tx_contents["recv_addr"] == self.node.public_key and tx_contents["type"] == TransactionType.AMOUNT.value:
+            self.node.bcc += tx_contents["amount"]
+            logging.info(f"Node's BCCs have increased to [{self.node.bcc}].")
+        self.node.transactions.append(transaction_as_dict)
+        # TODO: Check if capacity reached on separate thread.
+        logging.warning("Capacity checks have not been implemented yet!")
 
         return '', 200
 
@@ -77,8 +80,9 @@ class NodeController:
         logging.info("Node list has been updated successfully.")
 
         # TODO: Remove this after adding blockchain validation? BCCs can be calculated from there.
-        for node_info in nodes_info.values():
+        for node_info in self.node.other_nodes.values():
             node_info.bcc = Constants.STARTING_BCC_PER_NODE
+        self.node.bcc = Constants.STARTING_BCC_PER_NODE
 
         # No need for response body. Responding with status 200.
         return '', 200

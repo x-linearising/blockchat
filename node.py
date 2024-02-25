@@ -99,9 +99,29 @@ class Node(NodeInfo):
         return b
 
     def create_tx(self, recv, type, payload):
-        if recv.isdigit():
-            recv = self.other_nodes[int(recv)].public_key
         print(f"[Stub Method] Node {self.id} sends a transaction")
+
+        # Accept IDs instead of public keys as well.
+        if recv.isdigit():
+            if self.other_nodes.get(int(recv)) is None:
+                print(f"Specified Node [{int(recv)}] does not exist.")
+                return
+            recv = self.other_nodes[int(recv)].public_key
+
+        # Verify sufficient wallet
+        if type == TransactionType.MESSAGE.value:
+            transaction_cost = len(payload)
+        else:
+            transaction_cost = payload * Constants.TRANSFER_FEE_MULTIPLIER
+        if transaction_cost > self.bcc:
+            print(f"Transaction cannot proceed as the node does not have the required BCCs.")
+            return
+
+        # Decrease balance
+        if type == TransactionType.AMOUNT.value:
+            self.bcc -= transaction_cost
+            logging.info(f"Node's BCCs have been decreased to {self.bcc}.")
+
         tx_request = self.tx_builder.create(recv, type, payload)
         self.broadcast_request(tx_request, "/transactions")
 
