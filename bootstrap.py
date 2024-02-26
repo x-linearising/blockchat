@@ -24,7 +24,7 @@ class Bootstrap(Node):
         )
 
         genesis_block = Block(0, time(), [genesis_tx], self.public_key, 1)
-        genesis_block.block_hash = genesis_block.hash()
+        genesis_block.set_hash()
         
         self.blockchain.add(genesis_block)
         self.bcc = Constants.STARTING_BCC_PER_NODE * Constants.MAX_NODES
