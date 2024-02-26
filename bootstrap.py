@@ -18,7 +18,7 @@ class Bootstrap(Node):
 
     def genesis(self):
         genesis_tx = self.tx_builder.create(
-            Constants.BOOTSTRAP_PUBLIC_KEY,
+            Constants.BOOTSTRAP_PUBKEY,
             TransactionType.AMOUNT.value,
             Constants.STARTING_BCC_PER_NODE * Constants.MAX_NODES    
         )

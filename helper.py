@@ -2,9 +2,9 @@ import json
 import struct
 from base64 import b64encode
 from socket import gethostname, gethostbyname
-
 from cryptography.hazmat.primitives import hashes
-
+from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
+from cryptography.hazmat.primitives.serialization import load_ssh_public_key
 
 class JSONSerializable:
     """
@@ -24,6 +24,13 @@ def myIP():
     # 127.0.0.1 is their IP
     return gethostbyname(gethostname())
 
+def read_pubkey(path):
+    with open(path, "rb") as f:
+        k = load_ssh_public_key(f.read()) \
+            .public_bytes(Encoding.OpenSSH, PublicFormat.OpenSSH) \
+            .decode()
+        return k
+
 
 def sha256hash(data: bytes) -> bytes:
     digest = hashes.Hash(hashes.SHA256())
@@ -42,21 +49,22 @@ def hash_dict(d: dict) -> bytes:
     return d_hash
 
 def tx_str(tx, summarized=True, indent=1):
+    """
+    Pretty prints a transaction tx, repredented as a dict, with indent leading tabs.
+    If summarized is set, prints the characters at indexes 100 to 110 for strings
+    that are expected to be multi-line (signatures, public keys)
+    """
     tabs = indent * "\t"
     s = tabs + "hash: {}\n".format(tx["hash"])
     if summarized:
         s += tabs + "sign: ...{}...\n".format(tx["sign"][100:110]) 
         s += tabs + "sender_addr: ...{}...\n".format(tx["contents"]["sender_addr"][100:110])
+        s += tabs + "recv_addr: ...{}...\n".format(tx["contents"]["recv_addr"][100:110])
     else:   
         s += tabs + "sign: {}\n".format(tx["sign"])
         s += tabs + "sender_addr: {}\n".format(tx["contents"]["sender_addr"])
-    
-    # TODO: CHANGE THIS WHEN A CONSTANT, KNOWN PUBLIC KEY
-    # IS DEFINED FOR THE BOOTSTRAP NODE IN CONSTANTS!
-    if False:
-        s += tabs + "recv_addr: ...{}...\n".format(tx["contents"]["recv_addr"][100:110])
-    else:
         s += tabs + "recv_addr: {}\n".format(tx["contents"]["recv_addr"])
+    
     s += tabs + "type: {}\n".format(tx["contents"]["type"])
     s += tabs + "amount: {}\n".format(tx["contents"]["amount"])
     s += tabs + "message: {}\n".format(tx["contents"]["message"])
