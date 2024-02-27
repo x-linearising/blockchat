@@ -161,6 +161,7 @@ class Node(NodeInfo):
 
         self.transactions = self.transactions[Constants.CAPACITY:]
         block_request = BlockRequest.from_block_to_request(b)
+        self.blockchain.add(b)
         self.broadcast_request(block_request, '/blocks')
 
 
