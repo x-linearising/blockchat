@@ -1,12 +1,21 @@
+from os import path
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import rsa, padding
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
+from cryptography.hazmat.primitives.serialization import load_ssh_private_key
+from helper import read_pubkey
 
 class Wallet:
 
-    def __init__(self):
-        self._key_obj = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    def __init__(self, path=None):
+        if path is None:
+            self._key_obj = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        else:
+            # If a path is specified, read the private key from it
+            with open(path, "rb") as f:
+                self._key_obj = load_ssh_private_key(f.read(), password=b"")
+
         self.public_key = self \
             ._key_obj \
             .public_key() \
@@ -38,3 +47,16 @@ class Wallet:
             return True
         except InvalidSignature:
             return False
+
+
+if __name__ == "__main__":
+    # Simple test: load private key from file, sign a message with it,
+    # verify that the signature is valid
+    # test_msg = b"test input"
+    # w = Wallet(path.join(".", "bootstrap_keys", "id_rsa"))
+    # sign = w.sign(test_msg)
+    # if w.verify(sign, test_msg):
+    #     print("Signature was verified.")
+    # else:
+    #     print("[Error] Signature was not verified!")
+    read_pubkey("./bootstrap_keys/id_rsa.pub")

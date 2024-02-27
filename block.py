@@ -46,8 +46,11 @@ class Block():
         
         s += tabs + f"transactions: [\n"
         
-        for tx in self.transactions:
+        for i, tx in enumerate(self.transactions):
             s += tx_str(tx, summarized, indent+1)
+            # don't add a newline after the last transaction
+            if i != len(self.transactions) - 1:
+                s += "\n"
         s += tabs + "]"
         return s
 
