@@ -4,8 +4,10 @@ from threading import Thread
 from time import sleep
 from flask import Blueprint, abort, request
 
+from PoS import PoS
 from node import Node
 from bootstrap import Bootstrap
+from request_classes.block_request import BlockRequest
 from request_classes.blockchain_request import BlockchainRequest
 from request_classes.node_list_request import NodeListRequest
 from request_classes.join_request import JoinRequest
@@ -23,7 +25,11 @@ class NodeController:
         self.blueprint.add_url_rule("/nodes", "nodes", self.set_final_node_list, methods=["POST"])
         self.blueprint.add_url_rule("/blockchain", "blockchain", self.set_initial_blockchain, methods=["POST"])
         self.blueprint.add_url_rule("/transactions", "transaction", self.receive_transaction, methods=["POST"])
+        self.blueprint.add_url_rule("/blocks", "blocks", self.receive_block, methods=["POST"])
+        self.waiting_block = False
         self.node = Node(ip_address, port)
+        t = Thread(target = self.poll_capacity)
+        t.start()
 
     def receive_transaction(self):
         """
@@ -31,9 +37,8 @@ class NodeController:
         """
 
         # Extracting information from request
-        transaction_as_string = request.json
-        transaction_as_dict = json.loads(transaction_as_string)
-        tx_contents = json.loads(transaction_as_dict["contents"])
+        transaction_as_dict = request.json
+        tx_contents = transaction_as_dict["contents"]
         sender_public_key = tx_contents["sender_addr"]
         sender_info = self.node.get_node_info_by_public_key(sender_public_key)
         sender_id = self.node.get_node_id_by_public_key(sender_public_key)
@@ -53,7 +58,7 @@ class NodeController:
                 return "Invalid transaction type", 400
 
         # Transaction validations
-        if not verify_tx(transaction_as_string):
+        if not verify_tx(transaction_as_dict):
             return "Invalid signature.", 400
         if transaction_cost > sender_info.bcc:   # Stakes are not contained in bcc attribute.
             logging.warning("Transaction is not valid as node's amount is not sufficient.")
@@ -73,8 +78,6 @@ class NodeController:
                 logging.info(f"BCCs of node {recv_id} have increased to [{self.node.other_nodes[recv_id].bcc}].")
 
         self.node.transactions.append(transaction_as_dict)
-        # TODO: Check if capacity reached on separate thread.
-        logging.warning("Capacity checks have not been implemented yet!")
 
         return '', 200
 
@@ -124,6 +127,31 @@ class NodeController:
         # No need for response body. Responding with status 200.
         return '', 200
 
+    def poll_capacity(self):
+        while True:
+            # run_pos checks if the transaction list is of equal number to CAPACITY
+            if not self.waiting_block and len(self.node.transactions)>=Constants.CAPACITY:
+                print("BOOTSTRAP DOYLEPSE!")
+                strategy = PoS(self.node.stakes)
+                cur_block_validator = strategy.select_validator()
+                if self.node.id == cur_block_validator:
+                    self.node.create_send_block()
+                else:
+                    self.waiting_block = True
+            else:
+                sleep(1)
+
+    def receive_block(self):
+        # TODO: add the fees
+        b = BlockRequest.from_request_to_block(request.json)
+        if not b.validate(b.validator, b.prev_hash):
+            return " ", 400
+        self.node.blockchain.add(b)
+        self.waiting_block = False
+        #
+        self.node.transactions = self.node.transactions[Constants.CAPACITY:]
+        return " ", 200
+
 
 class BootstrapController(NodeController):
 
@@ -136,8 +164,12 @@ class BootstrapController(NodeController):
         # (which wouldn't work because of the self prefix)
         self.blueprint.add_url_rule("/nodes", "nodes", self.add_node, methods=["POST"])
         self.blueprint.add_url_rule("/transactions", "transactions", self.receive_transaction, methods=["POST"])
+        self.blueprint.add_url_rule("/blocks", "blocks", self.receive_block, methods=["POST"])
         t = Thread(target=self.poll_node_count)
         t.start()
+        t2 = Thread(target=self.poll_capacity)
+        t2.start()
+        self.waiting_block = False
 
     def poll_node_count(self):
         while True:

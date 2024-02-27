@@ -61,9 +61,16 @@ class Block():
     def set_hash(self):
         self.block_hash = b64encode(self.hash()).decode()
 
-    def validate(self):
+    def validate(self, val_pubkey, prev_hash):
         my_hash = hash_dict(self.contents())
-        return my_hash == self.block_hash
+        if not my_hash == self.block_hash:
+            return False
+        if not val_pubkey == self.validator:
+            return False
+        if not prev_hash == self.prev_hash:
+            return False
+        return True
+
             
     """
         theoro oti to transaction list exei ginei validate apo ton current node
@@ -82,10 +89,6 @@ def mint_block(node, transactions, capacity, blockchain):
             # insert it to blockchain (list of all blocks)
             blockchain.append(new_block)
 
-# validator node broadcasts new block to all other nodes
-def broadcast_block(validator_node, new_block):
-
-    return
 
 if __name__ == "__main__":
     w = wallet.Wallet()

@@ -6,6 +6,7 @@ import requests
 from block import Block
 from blockchain import Blockchain
 from constants import Constants
+from request_classes.block_request import BlockRequest
 from request_classes.join_request import JoinRequest
 from response_classes.join_response import JoinResponse
 from wallet import Wallet
@@ -135,6 +136,8 @@ class Node(NodeInfo):
             print(f"Transaction cannot proceed as the node does not have the required BCCs.")
             return
 
+
+
         # Balance updates
         if type == TransactionType.AMOUNT.value:
             self.bcc -= transaction_cost
@@ -147,6 +150,19 @@ class Node(NodeInfo):
 
         tx_request = self.tx_builder.create(recv, type, payload)
         self.broadcast_request(tx_request, "/transactions")
+
+
+    def create_send_block(self):
+        # create new block
+        prev_block = self.blockchain.blocks[-1]
+        b = Block(prev_block.id+1, time.time(), self.transactions[:Constants.CAPACITY], self.public_key, prev_block.block_hash)
+        b.set_hash()
+
+        self.transactions = self.transactions[Constants.CAPACITY:]
+        block_request = BlockRequest.from_block_to_request(b)
+        self.broadcast_request(block_request, '/blocks')
+
+
 
     def stake(self, amount):
         print(f"[Stub Method] Node {self.id} stakes {amount}")

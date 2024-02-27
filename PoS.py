@@ -1,5 +1,6 @@
 import random 
 random.seed(42)
+from constants import Constants
 # Implementing the Proof of Stake consensus mechanism,
 # to find the block validator
 
@@ -20,12 +21,12 @@ random.seed(42)
     me (receiver_address = 0, stacked amount).
     Epeita, ta stakes ginontai store se ena dict typou: {id:staked amount}
 """
-stakes = {'1' : 5,
-          '2' : 10,
-          '3' : 12,
-          '4' : 25,
-          '5' : 20,
-          }
+# stakes = {'1' : 5,
+#           '2' : 10,
+#           '3' : 12,
+#           '4' : 25,
+#           '5' : 20,
+#           }
 
 class PoS:
     def __init__(self, stakes):
@@ -38,6 +39,6 @@ class PoS:
         # convert dict to tuple (node,weight)
         nodes, weights = zip(*self.weights.items())
         validator_node = random.choices(nodes, weights=weights, k=1)[0]
-        return validator_node
-
+        # return validator_node
+        return Constants.BOOTSTRAP_PUBKEY
 
