@@ -136,8 +136,6 @@ class Node(NodeInfo):
             print(f"Transaction cannot proceed as the node does not have the required BCCs.")
             return
 
-
-
         # Balance updates
         if type == TransactionType.AMOUNT.value:
             self.bcc -= transaction_cost
@@ -155,8 +153,11 @@ class Node(NodeInfo):
     def create_send_block(self):
         # create new block
         prev_block = self.blockchain.blocks[-1]
-        b = Block(prev_block.id+1, time.time(), self.transactions[:Constants.CAPACITY], self.public_key, prev_block.block_hash)
+        b = Block(prev_block.idx+1, time.time(), self.transactions[:Constants.CAPACITY], self.public_key, prev_block.block_hash)
         b.set_hash()
+
+        print("Sending block")
+        print(b.to_str())
 
         self.transactions = self.transactions[Constants.CAPACITY:]
         block_request = BlockRequest.from_block_to_request(b)

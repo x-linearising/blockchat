@@ -35,7 +35,7 @@ class Bootstrap(Node):
         tx = self.tx_builder.create(recv_addr=request.public_key,
                                     trans_type=TransactionType.AMOUNT.value,
                                     payload=Constants.STARTING_BCC_PER_NODE)
-        self.transactions.append(tx)
+        # self.transactions.append(tx)
         self.other_nodes[id].bcc = Constants.STARTING_BCC_PER_NODE
         self.bcc -= Constants.STARTING_BCC_PER_NODE
 
