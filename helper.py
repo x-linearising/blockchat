@@ -50,7 +50,7 @@ def hash_dict(d: dict) -> bytes:
 
 def tx_str(tx, summarized=True, indent=1):
     """
-    Pretty prints a transaction tx, repredented as a dict, with indent leading tabs.
+    Pretty prints a transaction tx, represented as a dict, with indent leading tabs.
     If summarized is set, prints the characters at indexes 100 to 110 for strings
     that are expected to be multi-line (signatures, public keys)
     """
