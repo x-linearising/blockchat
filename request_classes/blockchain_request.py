@@ -21,8 +21,7 @@ class BlockchainRequest:
             # ...and parse them into this list
             transactions = []
             for tx in block_txs:
-                tx = json.loads(tx)
-                tx_contents = json.loads(tx["contents"])
+                tx_contents = tx["contents"]
                 tx_hash = tx["hash"]
                 tx_sign = tx["sign"]
                 contents = {

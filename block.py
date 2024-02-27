@@ -22,7 +22,7 @@ class Block():
                 "timestamp": self.timestamp,
                 "validator": self.validator,
                 "transactions": self.transactions,
-                "hash": b64encode(self.block_hash).decode()
+                "hash": self.block_hash
             }
         else:
             return {
@@ -57,6 +57,9 @@ class Block():
 
     def hash(self):
         return hash_dict(self.contents())
+
+    def set_hash(self):
+        self.block_hash = b64encode(self.hash()).decode()
 
     def validate(self):
         my_hash = hash_dict(self.contents())

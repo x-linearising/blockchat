@@ -1,14 +1,14 @@
 import json
 import struct
+from enum import Enum
 from base64 import b64encode, b64decode
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives.serialization import load_ssh_public_key
-from enum import Enum
 
-from helper import sha256hash
 import wallet
+from helper import sha256hash, dict_bytes
 
 
 class TransactionType(Enum):
@@ -53,18 +53,17 @@ class TransactionBuilder:
         tx_sign = self.wallet.sign(tx_bytes)
 
         tx = {
-            "contents": tx_str,
+            "contents": tx_contents,
             "hash": b64encode(tx_hash).decode(),
             "sign": b64encode(tx_sign).decode()
         }
 
         self.nonce += 1
 
-        return json.dumps(tx)
+        return tx
 
-def verify_tx(tx: str) -> bool:
-    tx = json.loads(tx)
-    tx_bytes = struct.pack("!" + str(len(tx["contents"])) + "s", bytes(tx["contents"], "ascii"))
+def verify_tx(tx) -> bool:
+    tx_bytes = dict_bytes(tx["contents"])
     my_hash = sha256hash(tx_bytes)
     tx["hash"] = b64decode(tx["hash"])
 
@@ -72,7 +71,6 @@ def verify_tx(tx: str) -> bool:
         print("Hash mismatch detected!")
         return False
 
-    tx["contents"] = json.loads(tx["contents"])
     sender_pubkey = load_ssh_public_key(bytes(tx["contents"]["sender_addr"], "ascii"))
     sign = b64decode(tx["sign"])
 
