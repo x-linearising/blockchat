@@ -4,7 +4,7 @@ from threading import Thread
 from time import sleep
 from flask import Blueprint, abort, request
 
-from node import Node
+from node import Node, NodeInfo
 from bootstrap import Bootstrap
 from request_classes.blockchain_request import BlockchainRequest
 from request_classes.node_list_request import NodeListRequest
@@ -31,9 +31,8 @@ class NodeController:
         """
 
         # Extracting information from request
-        transaction_as_string = request.json
-        transaction_as_dict = json.loads(transaction_as_string)
-        tx_contents = json.loads(transaction_as_dict["contents"])
+        transaction_as_dict = request.json
+        tx_contents = transaction_as_dict["contents"]
         sender_public_key = tx_contents["sender_addr"]
         sender_info = self.node.get_node_info_by_public_key(sender_public_key)
         sender_id = self.node.get_node_id_by_public_key(sender_public_key)
@@ -53,7 +52,7 @@ class NodeController:
                 return "Invalid transaction type", 400
 
         # Transaction validations
-        if not verify_tx(transaction_as_string):
+        if not verify_tx(transaction_as_dict):
             return "Invalid signature.", 400
         if transaction_cost > sender_info.bcc:   # Stakes are not contained in bcc attribute.
             logging.warning("Transaction is not valid as node's amount is not sufficient.")
@@ -93,11 +92,6 @@ class NodeController:
         # Updating node list
         self.node.other_nodes = nodes_info
         logging.info("Node list has been updated successfully.")
-
-        # TODO: Remove this after adding blockchain validation? BCCs can be calculated from there.
-        for node_info in self.node.other_nodes.values():
-            node_info.bcc = Constants.STARTING_BCC_PER_NODE
-        self.node.bcc = Constants.STARTING_BCC_PER_NODE
 
         # Initialize stakes at predefined value
         self.node.initialize_stakes()
@@ -146,6 +140,8 @@ class BootstrapController(NodeController):
                 self.node.broadcast_node_list()
                 self.node.broadcast_blockchain()
                 self.node.initialize_stakes()
+                self.node.perform_initial_transactions()
+
                 return
             else:
                 sleep(1)
@@ -167,7 +163,8 @@ class BootstrapController(NodeController):
         self.validate_join_request(join_request)
 
         # Adding node
-        self.node.add_node(join_request, self.nodes_counter)
+        info_of_new_node = NodeInfo(join_request.ip_address, join_request.port, join_request.public_key)
+        self.node.other_nodes[self.nodes_counter] = info_of_new_node
         logging.info(f"Node with id {self.nodes_counter} has been added to the network.")
 
         # Creating response

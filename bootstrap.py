@@ -51,7 +51,8 @@ class Bootstrap(Node):
         complete_list = self.other_nodes.copy()
         complete_list[self.id] = NodeInfo(self.ip_address,
                                           self.port,
-                                          self.public_key)
+                                          self.public_key,
+                                          self.bcc)
         # Send list to each node
         node_list_request = NodeListRequest.from_node_info_dict_to_request(complete_list)
         self.broadcast_request(node_list_request, "/nodes")
@@ -63,3 +64,21 @@ class Bootstrap(Node):
         self.broadcast_request(req, "/blockchain")
 
         logging.info("Bootstrap phase complete. All nodes have received the blockchain.")
+
+    def perform_initial_transactions(self):
+        """
+        Performed at the end of bootstrapping phase. Transfers the starting BCC amount to each node of the network.
+
+        """
+        for node in self.other_nodes.values():
+            transfer_amount = Constants.STARTING_BCC_PER_NODE
+            tx = self.tx_builder.create(recv_addr=node.public_key,
+                                        trans_type=TransactionType.AMOUNT.value,
+                                        payload=transfer_amount)
+            self.transactions.append(tx)
+            self.broadcast_request(tx, "/transactions")
+            self.transactions.append(tx)
+            node.bcc += transfer_amount
+            self.bcc -= transfer_amount
+
+

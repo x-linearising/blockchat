@@ -17,6 +17,7 @@ class NodeListRequest:
                 "ip_address": node_info.ip_address,
                 "port": node_info.port,
                 "public_key": node_info.public_key,
+                "bcc": node_info.bcc,
                 "id": node_id
             })
         return request
@@ -27,5 +28,6 @@ class NodeListRequest:
         for node in request:
             nodes_info[node["id"]] = NodeInfo(node["ip_address"],
                                               node["port"],
-                                              node["public_key"])
+                                              node["public_key"],
+                                              node["bcc"])
         return nodes_info
