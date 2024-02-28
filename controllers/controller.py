@@ -27,10 +27,9 @@ class NodeController:
         self.blueprint.add_url_rule("/blockchain", "blockchain", self.set_initial_blockchain, methods=["POST"])
         self.blueprint.add_url_rule("/transactions", "transaction", self.receive_transaction, methods=["POST"])
         self.blueprint.add_url_rule("/blocks", "blocks", self.receive_block, methods=["POST"])
-        self.waiting_block = False
         self.node = Node(ip_address, port)
-        # t = Thread(target = self.poll_capacity)
-        # t.start()
+        t2 = Thread(target=self.poll_capacity)
+        t2.start()
 
     def receive_transaction(self):
         """
@@ -105,7 +104,6 @@ class NodeController:
             node_info.bcc = Constants.STARTING_BCC_PER_NODE
         self.node.bcc = Constants.STARTING_BCC_PER_NODE
 
-        # Initialize stakes at predefined value
         self.node.initialize_stakes()
 
         # No need for response body. Responding with status 200.
@@ -127,37 +125,34 @@ class NodeController:
         
         logging.info("Blockchain has been updated successfully.")
 
+        self.node.is_validator = (self.node.public_key == self.node.next_validator())
+
         # No need for response body. Responding with status 200.
         return '', 200
 
-    # def poll_capacity(self):
-    #     while True:
-    #         # run_pos checks if the transaction list is of equal number to CAPACITY
-    #         if not self.waiting_block and len(self.node.transactions)>=Constants.CAPACITY:
-    #             print("BOOTSTRAP DOYLEPSE!")
-    #             strategy = PoS(self.node.stakes)
-    #             cur_block_validator = strategy.select_validator()
-    #             if self.node.id == cur_block_validator:
-    #                 self.node.create_send_block()
-    #             else:
-    #                 self.waiting_block = True
-    #         else:
-    #             sleep(1)
+    def poll_capacity(self):
+        while True:
+            if self.node.is_validator and len(self.node.transactions) >= Constants.CAPACITY:
+                print("Validator sends a block.")
+                self.node.mint_block()
+            else:
+                sleep(1)
 
     def receive_block(self):
         # TODO: add the fees
         b = BlockRequest.from_request_to_block(request.json)
 
-        print("Received block:")
-        print(b.to_str())
+        print("Received block!")
 
         if not b.validate(b.validator, b.prev_hash):
             return " ", 400
 
         self.node.blockchain.add(b)
-        self.waiting_block = False
         self.node.transactions = self.node.transactions[Constants.CAPACITY:]
-        return " ", 200
+            
+        next_validator = self.node.next_validator()
+        self.node.is_validator = next_validator == self.node.public_key 
+        return "", 200
 
 
 class BootstrapController(NodeController):
@@ -174,8 +169,7 @@ class BootstrapController(NodeController):
         self.blueprint.add_url_rule("/blocks", "blocks", self.receive_block, methods=["POST"])
         t = Thread(target=self.poll_node_count)
         t.start()
-        # self.waiting_block = False
-        t2 = Thread(target=self.bootstrap_poll_capacity)
+        t2 = Thread(target=self.poll_capacity)
         t2.start()
 
     def poll_node_count(self):
@@ -185,18 +179,12 @@ class BootstrapController(NodeController):
                 self.node.broadcast_node_list()
                 self.node.broadcast_blockchain()
                 self.node.initialize_stakes()
+                next_validator = self.node.next_validator()
+                self.node.is_validator = next_validator == self.node.public_key 
                 return
             else:
                 sleep(1)
 
-    # TODO: everyone should be a validator
-    def bootstrap_poll_capacity(self):
-        while True:
-            if len(self.node.transactions) >= Constants.CAPACITY:
-                print("Bootstrap sends a block.")
-                self.node.create_send_block()
-            else:
-                sleep(1)
 
     def add_node(self):
         """

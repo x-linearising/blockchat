@@ -83,24 +83,6 @@ class Block():
         return True
 
             
-    """
-        theoro oti to transaction list exei ginei validate apo ton current node
-        kapws prepei na ferw to blockchain = list of blocks
-    """
-
-def mint_block(node, transactions, capacity, blockchain):
-    # if the number of transactions has reached to max block capacity, node runs proof of stake
-    if len(transactions) == capacity:
-        strategy = PoS(PoS.stakes)
-        cur_block_validator = strategy.select_validator()
-        # if the current node is the block validator
-        if node.id == cur_block_validator:
-            # create the new block
-            new_block = Block(blockchain[-1], transactions, node)
-            # insert it to blockchain (list of all blocks)
-            blockchain.append(new_block)
-
-
 if __name__ == "__main__":
     w = wallet.Wallet()
     t = TransactionBuilder(w)
