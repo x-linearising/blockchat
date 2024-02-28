@@ -65,9 +65,8 @@ class TransactionBuilder:
 def verify_tx(tx) -> bool:
     tx_bytes = dict_bytes(tx["contents"])
     my_hash = sha256hash(tx_bytes)
-    tx["hash"] = b64decode(tx["hash"])
 
-    if tx["hash"] != my_hash:
+    if b64decode(tx["hash"]) != my_hash:
         print("Hash mismatch detected!")
         return False
 

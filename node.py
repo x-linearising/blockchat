@@ -6,6 +6,7 @@ import requests
 from block import Block
 from blockchain import Blockchain
 from constants import Constants
+from helper import tx_str
 from request_classes.block_request import BlockRequest
 from request_classes.join_request import JoinRequest
 from response_classes.join_response import JoinResponse
@@ -150,16 +151,18 @@ class Node(NodeInfo):
 
         tx_request = self.tx_builder.create(recv, type, payload)
         self.broadcast_request(tx_request, "/transactions")
+        self.transactions.append(tx_request)
 
 
     def create_send_block(self):
         # create new block
         prev_block = self.blockchain.blocks[-1]
-        b = Block(prev_block.id+1, time.time(), self.transactions[:Constants.CAPACITY], self.public_key, prev_block.block_hash)
+        b = Block(prev_block.idx+1, time.time(), self.transactions[:Constants.CAPACITY], self.public_key, prev_block.block_hash)
         b.set_hash()
 
         self.transactions = self.transactions[Constants.CAPACITY:]
         block_request = BlockRequest.from_block_to_request(b)
+        self.blockchain.add(b)
         self.broadcast_request(block_request, '/blocks')
 
 
@@ -200,6 +203,17 @@ class Node(NodeInfo):
                     print("[Error] Stake amount must be a number!")
             case "view":
                 self.view_block()
+            case "tx":
+                tabs = 1 * "\t"
+
+                s = tabs + f"transactions: [\n"
+
+                for i, tx in enumerate(self.transactions):
+                    s += tx_str(tx, True, 2)
+                    if i != len(self.transactions) - 1:
+                        s += "\n"
+                s += tabs + "]"
+                print(s)
             case "balance":
                 self.balance()
             case  "help":

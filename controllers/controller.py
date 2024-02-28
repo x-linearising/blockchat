@@ -1,4 +1,3 @@
-import json
 import logging
 from threading import Thread
 from time import sleep
@@ -26,7 +25,6 @@ class NodeController:
         self.blueprint.add_url_rule("/blockchain", "blockchain", self.set_initial_blockchain, methods=["POST"])
         self.blueprint.add_url_rule("/transactions", "transaction", self.receive_transaction, methods=["POST"])
         self.blueprint.add_url_rule("/blocks", "blocks", self.receive_block, methods=["POST"])
-        self.waiting_block = False
         self.node = Node(ip_address, port)
         t = Thread(target = self.poll_capacity)
         t.start()
@@ -128,28 +126,33 @@ class NodeController:
         return '', 200
 
     def poll_capacity(self):
+        blocks_competed_for = 1  # Counting the genesis block.
         while True:
-            # run_pos checks if the transaction list is of equal number to CAPACITY
-            if not self.waiting_block and len(self.node.transactions)>=Constants.CAPACITY:
+            if blocks_competed_for <= len(self.node.blockchain.blocks) and len(self.node.transactions)>=Constants.CAPACITY:
                 print("BOOTSTRAP DOYLEPSE!")
-                strategy = PoS(self.node.stakes)
-                cur_block_validator = strategy.select_validator()
-                if self.node.id == cur_block_validator:
+                # strategy = PoS(self.node.stakes)
+                # cur_block_validator = strategy.select_validator()
+                blocks_competed_for += 1  # Just competed for a block. Until this arrives in the chain, will not run another POS.
+                if self.node.id == Constants.BOOTSTRAP_ID:
                     self.node.create_send_block()
                 else:
-                    self.waiting_block = True
+                    self.node.transactions = self.node.transactions[Constants.CAPACITY:] # [1, 2, 3, 4, 5]
+                                                                                         # [1, 2, 3, 4, 6]
+                                                                                         # [6, 5]
             else:
+                # print("Not adding block yet...")
                 sleep(1)
 
     def receive_block(self):
         # TODO: add the fees
+        logging.info("Received validated block")
         b = BlockRequest.from_request_to_block(request.json)
+
+        # POS
+
         if not b.validate(b.validator, b.prev_hash):
             return " ", 400
         self.node.blockchain.add(b)
-        self.waiting_block = False
-        #
-        self.node.transactions = self.node.transactions[Constants.CAPACITY:]
         return " ", 200
 
 
@@ -169,7 +172,6 @@ class BootstrapController(NodeController):
         t.start()
         t2 = Thread(target=self.poll_capacity)
         t2.start()
-        self.waiting_block = False
 
     def poll_node_count(self):
         while True:
