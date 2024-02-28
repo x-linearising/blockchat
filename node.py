@@ -200,11 +200,16 @@ class Node(NodeInfo):
         print(self.blockchain.blocks[-1].to_str())
 
     def balance(self):
-        print(f"[Stub Method] Node {self.id} views its balance")
-
-        # TODO: This is temporary for testing. To be altered.
-        print(f"Stakes: {[(id, stake) for id, stake in self.stakes.items()]}.")
-        print(f"BCCs: {[(node_id, node.bcc) for node_id, node in self.other_nodes.items()]}. Self BCC: {self.bcc}.")
+        print("")
+        print("Node   Balance  Stake")
+        print("---------------------")
+        # line example:
+        #     "10 (*) 10999.99 53.26"
+        for i in range(Constants.MAX_NODES):
+            if i == self.id:
+                print("{:<3d}(*) {:<8.2f} {:.2f}".format(i, self.bcc, self.stakes[i]))
+            else:
+                print("{:<6d} {:<8.2f} {:.2f}".format(i, self.other_nodes[i].bcc, self.stakes[i]))
 
     def execute_cmd(self, line: str):
         # lstrip to remove leading whitespace, if any
