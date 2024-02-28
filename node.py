@@ -37,6 +37,7 @@ class Node(NodeInfo):
         
         self.transactions = []
         self.stakes = {}
+        self.expected_nonce = {}
         self.blockchain = Blockchain()
 
     def initialize_stakes(self):

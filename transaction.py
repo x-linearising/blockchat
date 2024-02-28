@@ -62,14 +62,18 @@ class TransactionBuilder:
 
         return tx
 
-def verify_tx(tx) -> bool:
+def verify_tx(tx, expected_nonce) -> bool:
     tx_bytes = dict_bytes(tx["contents"])
     my_hash = sha256hash(tx_bytes)
     tx["hash"] = b64decode(tx["hash"])
 
     if tx["hash"] != my_hash:
-        print("Hash mismatch detected!")
+        print("[Received Transaction] Hash mismatch detected!")
         return False
+
+    if tx["contents"]["nonce"] < expected_nonce:
+        print("[Received Transaction] Invalid nonce detected! (possible replay attack)")
+
 
     sender_pubkey = load_ssh_public_key(bytes(tx["contents"]["sender_addr"], "ascii"))
     sign = b64decode(tx["sign"])
@@ -86,7 +90,7 @@ def verify_tx(tx) -> bool:
         )
         return True
     except InvalidSignature: 
-        print("Invalid signature detected!")
+        print("[Received Transaction] Invalid signature detected!")
         return False
 
 
