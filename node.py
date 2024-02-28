@@ -1,8 +1,9 @@
 import logging
 import time
-
+import random
 import requests
 
+from helper import tx_str
 from block import Block
 from blockchain import Blockchain
 from constants import Constants
@@ -36,6 +37,7 @@ class Node(NodeInfo):
         else:
             self.id = node_id
         
+        self.is_validator = False
         self.transactions = []
         self.stakes = {}
         self.blockchain = Blockchain()
@@ -96,6 +98,27 @@ class Node(NodeInfo):
         # must return CAPACITY transactions
         return "TODO"
 
+    def next_validator(self):
+
+        print("Stakes:")
+        print(self.stakes)
+
+        total_stake = sum(self.stakes.values())
+        # dict with weight of every node, based on its staked amount
+        weights = {node_id: stake / total_stake for node_id, stake in self.stakes.items()}
+
+        nodes, _ = zip(*weights.items())
+
+        random.seed(self.blockchain.blocks[-1].block_hash)
+        tmp = random.choices(nodes, weights=weights, k=1)[0]
+        if tmp == self.id:
+            tmp = self.public_key
+        else:
+            tmp = self.other_nodes[tmp].public_key
+
+        # print("Next validator:", tmp[100:110])
+        return tmp
+
     def next_block(self):
         b = Block(
                 self.blockchain.blocks[-1].idx + 1,
@@ -148,6 +171,7 @@ class Node(NodeInfo):
 
         tx_request = self.tx_builder.create(recv, type, payload)
         self.broadcast_request(tx_request, "/transactions")
+        self.transactions.append(tx_request)
 
 
     def create_send_block(self):
@@ -164,6 +188,8 @@ class Node(NodeInfo):
         self.blockchain.add(b)
         self.broadcast_request(block_request, '/blocks')
 
+        next_validator = self.next_validator()
+        self.node.is_validator = next_validator == self.public_key 
 
 
     def stake(self, amount):
@@ -202,6 +228,18 @@ class Node(NodeInfo):
                     print("[Error] Stake amount must be a number!")
             case "view":
                 self.view_block()
+            case "tx":
+                print("is_validator:", self.is_validator)
+                tabs = 1 * "\t"
+
+                s = tabs + f"transactions: [\n"
+
+                for i, tx in enumerate(self.transactions):
+                    s += tx_str(tx, True, 2)
+                    if i != len(self.transactions) - 1:
+                        s += "\n"
+                s += tabs + "]"
+                print(s)
             case "balance":
                 self.balance()
             case  "help":
