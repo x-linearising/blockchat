@@ -129,28 +129,26 @@ class NodeController:
         blocks_competed_for = 1  # Counting the genesis block.
         while True:
             if blocks_competed_for <= len(self.node.blockchain.blocks) and len(self.node.transactions)>=Constants.CAPACITY:
-                print("BOOTSTRAP DOYLEPSE!")
-                # strategy = PoS(self.node.stakes)
-                # cur_block_validator = strategy.select_validator()
-                blocks_competed_for += 1  # Just competed for a block. Until this arrives in the chain, will not run another POS.
-                if self.node.id == Constants.BOOTSTRAP_ID:
+                validator = self.node.get_block_validator(blocks_competed_for)
+
+                if self.node.public_key == validator:
+                    print(f"Broadcasting block [{blocks_competed_for}]. ")
                     self.node.create_send_block()
                 else:
-                    self.node.transactions = self.node.transactions[Constants.CAPACITY:] # [1, 2, 3, 4, 5]
-                                                                                         # [1, 2, 3, 4, 6]
-                                                                                         # [6, 5]
+                    self.node.transactions = self.node.transactions[Constants.CAPACITY:]
+
+                blocks_competed_for += 1  # Just competed for a block. Until this arrives in the chain, will not run another POS.
             else:
                 # print("Not adding block yet...")
                 sleep(1)
 
     def receive_block(self):
         # TODO: add the fees
-        logging.info("Received validated block")
         b = BlockRequest.from_request_to_block(request.json)
+        logging.info(f"Received validated block [{b.idx}] from node [{self.node.get_node_id_by_public_key(b.validator)}].")
 
-        # POS
-
-        if not b.validate(b.validator, b.prev_hash):
+        validator = self.node.get_block_validator(b.idx)
+        if not b.validate(validator, b.prev_hash):
             return " ", 400
         self.node.blockchain.add(b)
         return " ", 200

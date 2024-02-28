@@ -1,4 +1,5 @@
 import logging
+import random
 import time
 
 import requests
@@ -97,6 +98,20 @@ class Node(NodeInfo):
         # must return CAPACITY transactions
         return "TODO"
 
+    def get_block_validator(self, block_index):
+        total_stake = sum(self.stakes.values())
+        node_ids, weights = zip(*[(i, self.stakes[i] / total_stake) for i in range(Constants.MAX_NODES)])
+
+        random.seed(self.blockchain.blocks[block_index - 1].block_hash)
+        tmp = random.choices(node_ids, weights=weights, k=1)[0]
+
+        if tmp == self.id:
+            tmp = self.public_key
+        else:
+            tmp = self.other_nodes[tmp].public_key
+
+        return tmp
+
     def next_block(self):
         b = Block(
                 self.blockchain.blocks[-1].idx + 1,
@@ -137,8 +152,6 @@ class Node(NodeInfo):
             print(f"Transaction cannot proceed as the node does not have the required BCCs.")
             return
 
-
-
         # Balance updates
         if type == TransactionType.AMOUNT.value:
             self.bcc -= transaction_cost
@@ -153,19 +166,20 @@ class Node(NodeInfo):
         self.broadcast_request(tx_request, "/transactions")
         self.transactions.append(tx_request)
 
-
     def create_send_block(self):
         # create new block
         prev_block = self.blockchain.blocks[-1]
-        b = Block(prev_block.idx+1, time.time(), self.transactions[:Constants.CAPACITY], self.public_key, prev_block.block_hash)
+        b = Block(prev_block.idx+1,
+                  time.time(),
+                  self.transactions[:Constants.CAPACITY],
+                  self.public_key,
+                  prev_block.block_hash)
         b.set_hash()
 
         self.transactions = self.transactions[Constants.CAPACITY:]
         block_request = BlockRequest.from_block_to_request(b)
         self.blockchain.add(b)
         self.broadcast_request(block_request, '/blocks')
-
-
 
     def stake(self, amount):
         print(f"[Stub Method] Node {self.id} stakes {amount}")
