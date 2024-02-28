@@ -66,7 +66,10 @@ class NodeController:
             logging.warning("Transaction is not valid as node's amount is not sufficient.")
             return "Not enough bcc to carry out transaction.", 400
 
-        # Next transaction must have an incremented nonce
+        # We assume that we cannot receive out-of-order transactions from the same sender,
+        # since senders wait for ACKs before continuing.
+        # Therefore the scenario of receiving the message w/ nonce n after n+1 is
+        # impossible 
         self.node.expected_nonce[sender_id] += 1
         # BCCs and transaction list updates
         sender_info.bcc -= transaction_cost
