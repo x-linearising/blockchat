@@ -60,12 +60,14 @@ class NodeController:
                 return "Invalid transaction type", 400
 
         # Transaction validations
-        if not verify_tx(transaction_as_dict):
+        if not verify_tx(transaction_as_dict, self.node.expected_nonce[sender_id]):
             return "Invalid signature.", 400
         if transaction_cost > sender_info.bcc:   # Stakes are not contained in bcc attribute.
             logging.warning("Transaction is not valid as node's amount is not sufficient.")
             return "Not enough bcc to carry out transaction.", 400
 
+        # Next transaction must have an incremented nonce
+        self.node.expected_nonce[sender_id] += 1
         # BCCs and transaction list updates
         sender_info.bcc -= transaction_cost
         if tx_contents["type"] == TransactionType.STAKE.value:
@@ -105,6 +107,9 @@ class NodeController:
         self.node.bcc = Constants.STARTING_BCC_PER_NODE
 
         self.node.initialize_stakes()
+
+        for k in nodes_info.keys():
+            self.node.expected_nonce[k] = 0
 
         # No need for response body. Responding with status 200.
         return '', 200

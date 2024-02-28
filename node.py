@@ -40,6 +40,7 @@ class Node(NodeInfo):
         self.is_validator = False
         self.transactions = []
         self.stakes = {}
+        self.expected_nonce = {}
         self.blockchain = Blockchain()
 
     def initialize_stakes(self):
