@@ -70,7 +70,7 @@ def verify_tx(tx, expected_nonce) -> bool:
         print("[Received Transaction] Hash mismatch detected!")
         return False
 
-    if tx["contents"]["nonce"] <= expected_nonce:
+    if tx["contents"]["nonce"] < expected_nonce:
         print("[Received Transaction] Invalid nonce detected! (possible replay attack)")
         return False
 
