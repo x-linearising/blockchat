@@ -4,8 +4,7 @@ from threading import Thread
 from time import sleep
 from flask import Blueprint, abort, request
 
-from PoS import PoS
-from node import Node
+from node import Node, NodeInfo
 from bootstrap import Bootstrap
 from helper import tx_str
 from request_classes.block_request import BlockRequest
@@ -38,8 +37,6 @@ class NodeController:
 
         # Extracting information from request
         transaction_as_dict = request.json
-        # print("Received transaction:")
-        # print(tx_str(transaction_as_dict), end = "")
         tx_contents = transaction_as_dict["contents"]
         sender_public_key = tx_contents["sender_addr"]
         sender_info = self.node.get_node_info_by_public_key(sender_public_key)
@@ -104,11 +101,7 @@ class NodeController:
         self.node.other_nodes = nodes_info
         logging.info("Node list has been updated successfully.")
 
-        # TODO: Remove this after adding blockchain validation? BCCs can be calculated from there.
-        for node_info in self.node.other_nodes.values():
-            node_info.bcc = Constants.STARTING_BCC_PER_NODE
-        self.node.bcc = Constants.STARTING_BCC_PER_NODE
-
+        # Initialize stakes at predefined value
         self.node.initialize_stakes()
 
         for k in nodes_info.keys():
@@ -189,6 +182,7 @@ class BootstrapController(NodeController):
                 self.node.initialize_stakes()
                 next_validator = self.node.next_validator()
                 self.node.is_validator = next_validator == self.node.public_key 
+                self.node.perform_initial_transactions()
                 return
             else:
                 sleep(1)
@@ -211,7 +205,11 @@ class BootstrapController(NodeController):
         self.validate_join_request(join_request)
 
         # Adding node
-        self.node.add_node(join_request, self.nodes_counter)
+        self.node.other_nodes[self.nodes_counter] = NodeInfo(
+            join_request.ip_address,
+            join_request.port,
+            join_request.public_key
+        )
         logging.info(f"Node with id {self.nodes_counter} has been added to the network.")
 
         # Creating response

@@ -15,11 +15,11 @@ from transaction import TransactionBuilder, TransactionType
 
 
 class NodeInfo:
-    def __init__(self, ip_address, port, public_key=None):
+    def __init__(self, ip_address, port, public_key=None, bcc=0):
         self.ip_address = ip_address
         self.port = port
         self.public_key = public_key
-        self.bcc = 0
+        self.bcc = bcc
 
     def get_node_url(self):
         url = f"http://{self.ip_address}:{self.port}"
@@ -173,7 +173,6 @@ class Node(NodeInfo):
         self.broadcast_request(tx_request, "/transactions")
         self.transactions.append(tx_request)
 
-
     def mint_block(self):
         # create new block
         prev_block = self.blockchain.blocks[-1]
@@ -190,7 +189,6 @@ class Node(NodeInfo):
 
         next_validator = self.next_validator()
         self.is_validator = (next_validator == self.public_key) 
-
 
     def stake(self, amount):
         print(f"[Stub Method] Node {self.id} stakes {amount}")

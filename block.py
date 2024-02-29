@@ -3,6 +3,7 @@ import time
 from base64 import b64encode
 import PoS
 import wallet
+from constants import Constants
 from helper import tx_str, hash_dict, sha256hash
 from transaction import TransactionBuilder, verify_tx, TransactionType
 
@@ -62,7 +63,23 @@ class Block():
     def set_hash(self):
         self.block_hash = b64encode(self.hash()).decode()
 
+    def block_fees(self):
+        """
+        Calculates the sum of the fees of all transactions. To be used when receiving or creating
+        a block to add the resulting amount to the validator.
+        :return:
+        """
+        total_fees = 0
+        for transaction in self.transactions:
+            if transaction["type"] is TransactionType.MESSAGE.value:
+                total_fees += len(transaction["message"])
+            elif transaction["type"] is TransactionType.AMOUNT.value:
+                total_fees += transaction["amount"] * (Constants.TRANSFER_FEE_MULTIPLIER - 1)
+        return total_fees
+        
+
     def validate(self, val_pubkey, prev_hash):
+        # my_hash = hash_dict(self.contents())
         my_hash = b64encode(hash_dict(self.contents())).decode()
 
         if not my_hash == self.block_hash:
