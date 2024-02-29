@@ -26,16 +26,22 @@ class NodeInfo:
         return url
 
 
-class Node(NodeInfo):
+class Node:
     def __init__(self, ip_address, port, node_id=None, path=None):
         self.wallet = Wallet(path)
-        self.other_nodes: dict[int, NodeInfo] = {}
         self.tx_builder = TransactionBuilder(self.wallet)
-        super().__init__(ip_address, port, self.wallet.public_key)
+        # TODO: plain nodes (everyone except the bootstrap) overwrite this
+        # when recv'ing the node list. find a better way??
+        self.my_info = NodeInfo(ip_address, port, self.wallet.public_key)
+        self.public_key = self.wallet.public_key
+        self.all_nodes: dict[int, NodeInfo] = {}
+
+        # Only the bootstrap node creates a Node object with known id
         if node_id is None:
             self.join_network()  # TODO: Maybe move this in Controller?
         else:
             self.id = node_id
+            self.all_nodes[self.id] = self.my_info
         
         self.is_validator = False
         self.transactions = []
@@ -45,19 +51,19 @@ class Node(NodeInfo):
         self.blockchain = Blockchain()
 
     def initialize_stakes(self):
-        for node_id, node_info in self.other_nodes.items():
+        for node_id, node_info in self.all_nodes.items():
             self.stakes[node_id] = Constants.INITIAL_STAKE
             self.validated_stakes[node_id] = Constants.INITIAL_STAKE
-            self.other_nodes[node_id].bcc -= Constants.INITIAL_STAKE
+            self.all_nodes[node_id].bcc -= Constants.INITIAL_STAKE
         return self.stakes
 
     def get_node_info_by_public_key(self, public_key):
-        for node_info in self.other_nodes.values():
+        for node_info in self.all_nodes.values():
             if node_info.public_key == public_key:
                 return node_info
 
     def get_node_id_by_public_key(self, public_key):
-        for node_id, node_info in self.other_nodes.items():
+        for node_id, node_info in self.all_nodes.items():
             if node_info.public_key == public_key:
                 return node_id
 
@@ -70,11 +76,17 @@ class Node(NodeInfo):
         logging.info("Sending request to Boostrap Node to join the network.")
 
         # Make request to boostrap node
-        join_request = JoinRequest(self.public_key, self.ip_address, self.port)
+        join_request = JoinRequest(
+            self.my_info.public_key,
+            self.my_info.ip_address,
+            self.my_info.port
+        )
 
-        join_response = requests.post(Constants.BOOTSTRAP_URL + "/nodes",
-                                      json=join_request.to_dict(),
-                                      headers=Constants.JSON_HEADER)
+        join_response = requests.post(
+            Constants.BOOTSTRAP_URL + "/nodes",
+            json=join_request.to_dict(),
+            headers=Constants.JSON_HEADER,
+        )
 
         if join_response.ok:
             response = JoinResponse.from_json(join_response.json())
@@ -85,7 +97,7 @@ class Node(NodeInfo):
                           with status [{join_response.status_code}] and message [{join_response.text}].""")
 
     def broadcast_request(self, request_body, endpoint):
-        for node_id, node in self.other_nodes.items():
+        for node_id, node in self.all_nodes.items():
             # Do not send a request to myself!
             if node_id == self.id:
                 continue
@@ -113,22 +125,20 @@ class Node(NodeInfo):
         # print(weights)
 
         random.seed(self.blockchain.blocks[-1].block_hash)
-        tmp = random.choices(nodes, weights=weights, k=1)[0]
+        i = random.choices(nodes, weights=weights, k=1)[0]
         
-        print("next validator id:", tmp)
+        print("[Proof of Stake] Next validator id:", i)
 
-        tmp = self.other_nodes[tmp].public_key
-
-        return tmp
+        return self.all_nodes[i].public_key
 
 
     def create_tx(self, recv, type, payload):
         # Accept IDs instead of public keys as well.
         if recv.isdigit():
-            if self.other_nodes.get(int(recv)) is None:
+            if self.all_nodes.get(int(recv)) is None:
                 print(f"Specified Node [{int(recv)}] does not exist.")
                 return
-            recv = self.other_nodes[int(recv)].public_key
+            recv = self.all_nodes[int(recv)].public_key
 
         if recv == self.public_key and type != TransactionType.STAKE.value:
             print("Cannot send transaction to sender.")
@@ -147,17 +157,17 @@ class Node(NodeInfo):
                 return
         print(f"Total transaction cost: {transaction_cost}")
 
-        if transaction_cost > self.other_nodes[self.id].bcc:
+        if transaction_cost > self.my_info.bcc:
             print(f"Transaction cannot proceed as the node does not have the required BCCs.")
             return
 
         # Balance updates
         if type == TransactionType.AMOUNT.value:
-            self.other_nodes[self.id].bcc -= transaction_cost
+            self.my_info.bcc -= transaction_cost
             recv_id = self.get_node_id_by_public_key(recv)
-            self.other_nodes[recv_id].bcc += payload
+            self.all_nodes[recv_id].bcc += payload
         elif type == TransactionType.STAKE.value:
-            self.other_nodes[self.id].bcc -= transaction_cost
+            self.my_info.bcc -= transaction_cost
             self.stakes[self.id] = payload
 
         tx_request = self.tx_builder.create(recv, type, payload)
@@ -165,13 +175,12 @@ class Node(NodeInfo):
         self.transactions.append(tx_request)
 
     def mint_block(self):
-        # create new block
         prev_block = self.blockchain.blocks[-1]
         b = Block(prev_block.idx+1, time.time(), self.transactions[:Constants.CAPACITY], self.public_key, prev_block.block_hash)
         b.set_hash()
 
         print("As the validator, I won {:.2f} in fees".format(b.fees()))
-        self.other_nodes[self.id].bcc += b.fees()
+        self.my_info.bcc += b.fees()
 
         print("Sending block!")
         # print(b.to_str())
@@ -205,11 +214,11 @@ class Node(NodeInfo):
         #     "10 (*) 10999.99 53.26"
         for i in range(Constants.MAX_NODES):
             c = "(*)" if i == self.id else "   "
-            total = self.other_nodes[i].bcc + self.stakes[i]
+            total = self.all_nodes[i].bcc + self.stakes[i]
             print("{:<3d}{} {:<8.2f} {:<8.2f} {:<8.2f} {:<8.2f}".format(
                 i,
                 c,
-                self.other_nodes[i].bcc,
+                self.all_nodes[i].bcc,
                 self.stakes[i],
                 total,
                 self.validated_stakes[i]),
