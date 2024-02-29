@@ -6,6 +6,7 @@ import requests
 from block import Block
 from blockchain import Blockchain
 from constants import Constants
+from helper import tx_str
 from request_classes.join_request import JoinRequest
 from response_classes.join_response import JoinResponse
 from wallet import Wallet
@@ -13,11 +14,11 @@ from transaction import TransactionBuilder, TransactionType
 
 
 class NodeInfo:
-    def __init__(self, ip_address, port, public_key=None):
+    def __init__(self, ip_address, port, public_key=None, bcc=0):
         self.ip_address = ip_address
         self.port = port
         self.public_key = public_key
-        self.bcc = 0
+        self.bcc = bcc
 
     def get_node_url(self):
         url = f"http://{self.ip_address}:{self.port}"
@@ -147,6 +148,7 @@ class Node(NodeInfo):
 
         tx_request = self.tx_builder.create(recv, type, payload)
         self.broadcast_request(tx_request, "/transactions")
+        self.transactions.append(tx_request)
 
     def stake(self, amount):
         print(f"[Stub Method] Node {self.id} stakes {amount}")
@@ -184,6 +186,17 @@ class Node(NodeInfo):
                     print("[Error] Stake amount must be a number!")
             case "view":
                 self.view_block()
+            case "tx":
+                tabs = 1 * "\t"
+
+                s = tabs + f"transactions: [\n"
+
+                for i, tx in enumerate(self.transactions):
+                    s += tx_str(tx, True, 2)
+                    if i != len(self.transactions) - 1:
+                        s += "\n"
+                s += tabs + "]"
+                print(s)
             case "balance":
                 self.balance()
             case  "help":

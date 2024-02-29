@@ -2,6 +2,7 @@ import time
 from base64 import b64encode
 import PoS
 import wallet
+from constants import Constants
 from helper import tx_str, hash_dict, sha256hash
 from transaction import TransactionBuilder, verify_tx, TransactionType
 
@@ -69,6 +70,21 @@ class Block():
         theoro oti to transaction list exei ginei validate apo ton current node
         kapws prepei na ferw to blockchain = list of blocks
     """
+
+    def block_fees(self):
+        """
+        Calculates the sum of the fees of all transactions. To be used when receiving or creating
+        a block to add the resulting amount to the validator.
+        :return:
+        """
+        total_fees = 0
+        for transaction in self.transactions:
+            if transaction["type"] is TransactionType.MESSAGE.value:
+                total_fees += len(transaction["message"])
+            elif transaction["type"] is TransactionType.AMOUNT.value:
+                total_fees += transaction["amount"] * (Constants.TRANSFER_FEE_MULTIPLIER - 1)
+        return total_fees
+
 
 def mint_block(node, transactions, capacity, blockchain):
     # if the number of transactions has reached to max block capacity, node runs proof of stake
