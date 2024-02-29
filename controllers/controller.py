@@ -141,7 +141,6 @@ class NodeController:
                 sleep(1)
 
     def receive_block(self):
-        # TODO: add the fees
         b = BlockRequest.from_request_to_block(request.json)
 
         print("Received block!")
@@ -155,6 +154,12 @@ class NodeController:
 
         self.node.blockchain.add(b)
         self.node.transactions = self.node.transactions[Constants.CAPACITY:]
+
+        for staker_public_key, stake in b.stakes().items():
+            if staker_public_key == self.node.public_key:
+                self.node.validated_stakes[self.node.id] = stake
+            else:
+                self.node.validated_stakes[self.node.get_node_id_by_public_key(staker_public_key)] = stake
             
         next_validator = self.node.next_validator()
         self.node.is_validator = next_validator == self.node.public_key 
