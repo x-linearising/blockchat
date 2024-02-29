@@ -1,12 +1,13 @@
 import logging
 import time
-
+import random
 import requests
 
+from helper import tx_str
 from block import Block
 from blockchain import Blockchain
 from constants import Constants
-from helper import tx_str
+from request_classes.block_request import BlockRequest
 from request_classes.join_request import JoinRequest
 from response_classes.join_response import JoinResponse
 from wallet import Wallet
@@ -36,8 +37,10 @@ class Node(NodeInfo):
         else:
             self.id = node_id
         
+        self.is_validator = False
         self.transactions = []
         self.stakes = {}
+        self.expected_nonce = {}
         self.blockchain = Blockchain()
 
     def initialize_stakes(self):
@@ -87,7 +90,8 @@ class Node(NodeInfo):
                                      json=request_body,
                                      headers=Constants.JSON_HEADER)
             if response.ok:
-                logging.info(f"Request to node {node_id} was successful with status code: {response.status_code}.")
+                # logging.info(f"Request to node {node_id} was successful with status code: {response.status_code}.")
+                pass
             else:
                 # TODO: Handle this?
                 logging.error(f"Request to node {node_id} failed with status code: {response.status_code}.")
@@ -95,6 +99,27 @@ class Node(NodeInfo):
     def _choose_txs_algo(self):
         # must return CAPACITY transactions
         return "TODO"
+
+    def next_validator(self):
+
+        nodes = [i for i in range(Constants.MAX_NODES)]
+        
+        stakes = [self.stakes[i] for i in nodes]
+        total_stake = sum(stakes)
+
+        weights = [stakes[i]/total_stake for i in nodes]
+
+        random.seed(self.blockchain.blocks[-1].block_hash)
+        tmp = random.choices(nodes, weights=weights, k=1)[0]
+        
+        print("next validator id:", tmp)
+
+        if tmp == self.id:
+            tmp = self.public_key
+        else:
+            tmp = self.other_nodes[tmp].public_key
+
+        return tmp
 
     def next_block(self):
         b = Block(
@@ -108,8 +133,6 @@ class Node(NodeInfo):
         return b
 
     def create_tx(self, recv, type, payload):
-        print(f"[Stub Method] Node {self.id} sends a transaction")
-
         # Accept IDs instead of public keys as well.
         if recv.isdigit():
             if self.other_nodes.get(int(recv)) is None and int(recv) != self.id:
@@ -149,6 +172,23 @@ class Node(NodeInfo):
         tx_request = self.tx_builder.create(recv, type, payload)
         self.broadcast_request(tx_request, "/transactions")
         self.transactions.append(tx_request)
+
+    def mint_block(self):
+        # create new block
+        prev_block = self.blockchain.blocks[-1]
+        b = Block(prev_block.idx+1, time.time(), self.transactions[:Constants.CAPACITY], self.public_key, prev_block.block_hash)
+        b.set_hash()
+
+        print("Sending block!")
+        # print(b.to_str())
+
+        self.transactions = self.transactions[Constants.CAPACITY:]
+        block_request = BlockRequest.from_block_to_request(b)
+        self.blockchain.add(b)
+        self.broadcast_request(block_request, '/blocks')
+
+        next_validator = self.next_validator()
+        self.is_validator = (next_validator == self.public_key) 
 
     def stake(self, amount):
         print(f"[Stub Method] Node {self.id} stakes {amount}")
@@ -192,6 +232,7 @@ class Node(NodeInfo):
             case "view":
                 self.view_block()
             case "tx":
+                print("is_validator:", self.is_validator)
                 tabs = 1 * "\t"
 
                 s = tabs + f"transactions: [\n"

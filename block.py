@@ -1,3 +1,4 @@
+import logging
 import time
 from base64 import b64encode
 import PoS
@@ -62,15 +63,6 @@ class Block():
     def set_hash(self):
         self.block_hash = b64encode(self.hash()).decode()
 
-    def validate(self):
-        my_hash = hash_dict(self.contents())
-        return my_hash == self.block_hash
-            
-    """
-        theoro oti to transaction list exei ginei validate apo ton current node
-        kapws prepei na ferw to blockchain = list of blocks
-    """
-
     def block_fees(self):
         """
         Calculates the sum of the fees of all transactions. To be used when receiving or creating
@@ -84,25 +76,30 @@ class Block():
             elif transaction["type"] is TransactionType.AMOUNT.value:
                 total_fees += transaction["amount"] * (Constants.TRANSFER_FEE_MULTIPLIER - 1)
         return total_fees
+        
 
+    def validate(self, val_pubkey, prev_hash):
+        # my_hash = hash_dict(self.contents())
+        my_hash = b64encode(hash_dict(self.contents())).decode()
 
-def mint_block(node, transactions, capacity, blockchain):
-    # if the number of transactions has reached to max block capacity, node runs proof of stake
-    if len(transactions) == capacity:
-        strategy = PoS(PoS.stakes)
-        cur_block_validator = strategy.select_validator()
-        # if the current node is the block validator
-        if node.id == cur_block_validator:
-            # create the new block
-            new_block = Block(blockchain[-1], transactions, node)
-            # insert it to blockchain (list of all blocks)
-            blockchain.append(new_block)
+        if not my_hash == self.block_hash:
+            logging.warning("Block hash mismatch")
+            print("Calculated hash:", my_hash)
+            print("Received hash:", self.block_hash)
+            return False
+        if not val_pubkey == self.validator:
+            logging.warning("Validator mismatch")
+            print("Expected validator:", val_pubkey)
+            print("Received validator:", self.validator)
+            return False
+        if not prev_hash == self.prev_hash:
+            logging.warning("Previous hash mismatch")
+            print("Previous hash:", prev_hash)
+            print("Received previous hash:", self.prev_hash)
+            return False
+        return True
 
-# validator node broadcasts new block to all other nodes
-def broadcast_block(validator_node, new_block):
-
-    return
-
+            
 if __name__ == "__main__":
     w = wallet.Wallet()
     t = TransactionBuilder(w)

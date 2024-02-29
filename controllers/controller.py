@@ -6,6 +6,8 @@ from flask import Blueprint, abort, request
 
 from node import Node, NodeInfo
 from bootstrap import Bootstrap
+from helper import tx_str
+from request_classes.block_request import BlockRequest
 from request_classes.blockchain_request import BlockchainRequest
 from request_classes.node_list_request import NodeListRequest
 from request_classes.join_request import JoinRequest
@@ -23,7 +25,10 @@ class NodeController:
         self.blueprint.add_url_rule("/nodes", "nodes", self.set_final_node_list, methods=["POST"])
         self.blueprint.add_url_rule("/blockchain", "blockchain", self.set_initial_blockchain, methods=["POST"])
         self.blueprint.add_url_rule("/transactions", "transaction", self.receive_transaction, methods=["POST"])
+        self.blueprint.add_url_rule("/blocks", "blocks", self.receive_block, methods=["POST"])
         self.node = Node(ip_address, port)
+        t2 = Thread(target=self.poll_capacity)
+        t2.start()
 
     def receive_transaction(self):
         """
@@ -37,7 +42,7 @@ class NodeController:
         sender_info = self.node.get_node_info_by_public_key(sender_public_key)
         sender_id = self.node.get_node_id_by_public_key(sender_public_key)
 
-        logging.info(f"Received transaction from Node {sender_id}.")
+        # logging.info(f"Received transaction from Node {sender_id}.")
 
         # Transaction Cost
         match tx_contents["type"]:
@@ -52,12 +57,17 @@ class NodeController:
                 return "Invalid transaction type", 400
 
         # Transaction validations
-        if not verify_tx(transaction_as_dict):
+        if not verify_tx(transaction_as_dict, self.node.expected_nonce[sender_id]):
             return "Invalid signature.", 400
         if transaction_cost > sender_info.bcc:   # Stakes are not contained in bcc attribute.
             logging.warning("Transaction is not valid as node's amount is not sufficient.")
             return "Not enough bcc to carry out transaction.", 400
 
+        # We assume that we cannot receive out-of-order transactions from the same sender,
+        # since senders wait for ACKs before continuing.
+        # Therefore the scenario of receiving the message w/ nonce n after n+1 is
+        # impossible 
+        self.node.expected_nonce[sender_id] += 1
         # BCCs and transaction list updates
         sender_info.bcc -= transaction_cost
         if tx_contents["type"] == TransactionType.STAKE.value:
@@ -72,8 +82,6 @@ class NodeController:
                 logging.info(f"BCCs of node {recv_id} have increased to [{self.node.other_nodes[recv_id].bcc}].")
 
         self.node.transactions.append(transaction_as_dict)
-        # TODO: Check if capacity reached on separate thread.
-        logging.warning("Capacity checks have not been implemented yet!")
 
         return '', 200
 
@@ -96,6 +104,9 @@ class NodeController:
         # Initialize stakes at predefined value
         self.node.initialize_stakes()
 
+        for k in nodes_info.keys():
+            self.node.expected_nonce[k] = 0
+
         # No need for response body. Responding with status 200.
         return '', 200
 
@@ -108,15 +119,41 @@ class NodeController:
 
         # Mapping request body to class
         blocks = BlockchainRequest.from_request_to_blocks(request.json)
-        print(blocks[0].to_str())
+        # print(blocks[0].to_str())
 
         # Updating node list
         self.node.blockchain.blocks = blocks
         
         logging.info("Blockchain has been updated successfully.")
 
+        self.node.is_validator = (self.node.public_key == self.node.next_validator())
+
         # No need for response body. Responding with status 200.
         return '', 200
+
+    def poll_capacity(self):
+        while True:
+            if self.node.is_validator and len(self.node.transactions) >= Constants.CAPACITY:
+                print("Validator sends a block.")
+                self.node.mint_block()
+            else:
+                sleep(1)
+
+    def receive_block(self):
+        # TODO: add the fees
+        b = BlockRequest.from_request_to_block(request.json)
+
+        print("Received block!")
+
+        if not b.validate(b.validator, b.prev_hash):
+            return " ", 400
+
+        self.node.blockchain.add(b)
+        self.node.transactions = self.node.transactions[Constants.CAPACITY:]
+            
+        next_validator = self.node.next_validator()
+        self.node.is_validator = next_validator == self.node.public_key 
+        return "", 200
 
 
 class BootstrapController(NodeController):
@@ -130,8 +167,11 @@ class BootstrapController(NodeController):
         # (which wouldn't work because of the self prefix)
         self.blueprint.add_url_rule("/nodes", "nodes", self.add_node, methods=["POST"])
         self.blueprint.add_url_rule("/transactions", "transactions", self.receive_transaction, methods=["POST"])
+        self.blueprint.add_url_rule("/blocks", "blocks", self.receive_block, methods=["POST"])
         t = Thread(target=self.poll_node_count)
         t.start()
+        t2 = Thread(target=self.poll_capacity)
+        t2.start()
 
     def poll_node_count(self):
         while True:
@@ -140,11 +180,13 @@ class BootstrapController(NodeController):
                 self.node.broadcast_node_list()
                 self.node.broadcast_blockchain()
                 self.node.initialize_stakes()
+                next_validator = self.node.next_validator()
+                self.node.is_validator = next_validator == self.node.public_key 
                 self.node.perform_initial_transactions()
-
                 return
             else:
                 sleep(1)
+
 
     def add_node(self):
         """

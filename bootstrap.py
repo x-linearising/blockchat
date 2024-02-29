@@ -47,6 +47,9 @@ class Bootstrap(Node):
         node_list_request = NodeListRequest.from_node_info_dict_to_request(complete_list)
         self.broadcast_request(node_list_request, "/nodes")
 
+        for k in self.other_nodes.keys():
+            self.expected_nonce[k] = 0
+
         logging.info("Bootstrap phase complete. All nodes have received the participant list.")
 
     def broadcast_blockchain(self):
