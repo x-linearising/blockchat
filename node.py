@@ -121,16 +121,6 @@ class Node(NodeInfo):
 
         return tmp
 
-    def next_block(self):
-        b = Block(
-                self.blockchain.blocks[-1].idx + 1,
-                time.time(),
-                self._choose_txs_algo(),
-                self.public_key,
-                self.blockchain.blocks[-1].hash
-            )
-        b.block_hash = b.hash()
-        return b
 
     def create_tx(self, recv, type, payload):
         # Accept IDs instead of public keys as well.
@@ -178,6 +168,9 @@ class Node(NodeInfo):
         prev_block = self.blockchain.blocks[-1]
         b = Block(prev_block.idx+1, time.time(), self.transactions[:Constants.CAPACITY], self.public_key, prev_block.block_hash)
         b.set_hash()
+
+        print("As the validator, I won {:.2f} in fees".format(b.fees()))
+        self.bcc += b.fees()
 
         print("Sending block!")
         # print(b.to_str())

@@ -77,9 +77,10 @@ class NodeController:
                 self.node.bcc += tx_contents["amount"]
                 logging.info(f"Node's BCCs have increased to [{self.node.bcc}].")
             else:
-                recv_id = self.node.get_node_id_by_public_key(tx_contents["recv_addr"])
-                self.node.other_nodes[recv_id].bcc += tx_contents["amount"]
-                logging.info(f"BCCs of node {recv_id} have increased to [{self.node.other_nodes[recv_id].bcc}].")
+                # recv_id = self.node.get_node_id_by_public_key(tx_contents["recv_addr"])
+                # self.node.other_nodes[recv_id].bcc += tx_contents["amount"]
+                self.node.get_node_info_by_public_key(tx_contents["recv_addr"]).bcc += tx_contents["amount"]
+                # logging.info(f"BCCs of node {recv_id} have increased to [{self.node.other_nodes[recv_id].bcc}].")
 
         self.node.transactions.append(transaction_as_dict)
 
@@ -147,6 +148,10 @@ class NodeController:
 
         if not b.validate(b.validator, b.prev_hash):
             return " ", 400
+
+        val_id = self.node.get_node_id_by_public_key(b.validator)
+        print("Giving {:.2f} to the validator".format(b.fees()))
+        self.node.other_nodes[val_id].bcc += b.fees()
 
         self.node.blockchain.add(b)
         self.node.transactions = self.node.transactions[Constants.CAPACITY:]

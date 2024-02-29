@@ -63,18 +63,24 @@ class Block():
     def set_hash(self):
         self.block_hash = b64encode(self.hash()).decode()
 
-    def block_fees(self):
+    def fees(self):
         """
         Calculates the sum of the fees of all transactions. To be used when receiving or creating
         a block to add the resulting amount to the validator.
         :return:
         """
         total_fees = 0
-        for transaction in self.transactions:
-            if transaction["type"] is TransactionType.MESSAGE.value:
-                total_fees += len(transaction["message"])
-            elif transaction["type"] is TransactionType.AMOUNT.value:
-                total_fees += transaction["amount"] * (Constants.TRANSFER_FEE_MULTIPLIER - 1)
+        for tx in self.transactions:
+            tx_contents = tx["contents"]
+
+            # print("Current tx:")
+            # print("amount: {}".format(tx_contents["amount"]))
+
+            if tx_contents["type"] == TransactionType.MESSAGE.value:
+                total_fees += len(tx_contents["message"])
+            elif tx_contents["type"] == TransactionType.AMOUNT.value:
+                total_fees += tx_contents["amount"] * (Constants.TRANSFER_FEE_MULTIPLIER - 1)
+
         return total_fees
         
 
