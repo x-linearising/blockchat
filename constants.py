@@ -7,6 +7,7 @@ class Constants:
     BOOTSTRAP_ID = 0
     BOOTSTRAP_PUBKEY_PATH = path.join(".", "bootstrap_keys", "id_rsa.pub")
     BOOTSTRAP_PUBKEY = read_pubkey(BOOTSTRAP_PUBKEY_PATH)
+    BOOTSTRAP_PRIVKEY_PATH = path.join(".", "bootstrap_keys", "id_rsa")
     BOOTSTRAP_URL = f"http://{BOOTSTRAP_IP_ADDRESS}:{BOOTSTRAP_PORT}"
 
     MAX_NODES = 3

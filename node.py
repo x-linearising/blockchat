@@ -27,8 +27,8 @@ class NodeInfo:
 
 
 class Node(NodeInfo):
-    def __init__(self, ip_address, port, node_id=None):
-        self.wallet = Wallet()
+    def __init__(self, ip_address, port, node_id=None, path=None):
+        self.wallet = Wallet(path)
         self.other_nodes: dict[int, NodeInfo] = {}
         self.tx_builder = TransactionBuilder(self.wallet)
         super().__init__(ip_address, port, self.wallet.public_key)
@@ -45,9 +45,6 @@ class Node(NodeInfo):
         self.blockchain = Blockchain()
 
     def initialize_stakes(self):
-        self.stakes[self.id] = Constants.INITIAL_STAKE
-        self.validated_stakes[self.id] = Constants.INITIAL_STAKE
-        self.bcc -= Constants.INITIAL_STAKE
         for node_id, node_info in self.other_nodes.items():
             self.stakes[node_id] = Constants.INITIAL_STAKE
             self.validated_stakes[node_id] = Constants.INITIAL_STAKE
@@ -89,6 +86,10 @@ class Node(NodeInfo):
 
     def broadcast_request(self, request_body, endpoint):
         for node_id, node in self.other_nodes.items():
+            # Do not send a request to myself!
+            if node_id == self.id:
+                continue
+
             response = requests.post(node.get_node_url() + endpoint,
                                      json=request_body,
                                      headers=Constants.JSON_HEADER)
@@ -99,28 +100,24 @@ class Node(NodeInfo):
                 # TODO: Handle this?
                 logging.error(f"Request to node {node_id} failed with status code: {response.status_code}.")
 
-    def _choose_txs_algo(self):
-        # must return CAPACITY transactions
-        return "TODO"
-
     def next_validator(self):
 
         nodes = [i for i in range(Constants.MAX_NODES)]
 
         stakes = [self.validated_stakes[i] for i in nodes]
+
         total_stake = sum(stakes)
 
         weights = [stakes[i]/total_stake for i in nodes]
+        # print("Finding next validator with probabilities:")
+        # print(weights)
 
         random.seed(self.blockchain.blocks[-1].block_hash)
         tmp = random.choices(nodes, weights=weights, k=1)[0]
         
         print("next validator id:", tmp)
 
-        if tmp == self.id:
-            tmp = self.public_key
-        else:
-            tmp = self.other_nodes[tmp].public_key
+        tmp = self.other_nodes[tmp].public_key
 
         return tmp
 
@@ -128,10 +125,10 @@ class Node(NodeInfo):
     def create_tx(self, recv, type, payload):
         # Accept IDs instead of public keys as well.
         if recv.isdigit():
-            if self.other_nodes.get(int(recv)) is None and int(recv) != self.id:
+            if self.other_nodes.get(int(recv)) is None:
                 print(f"Specified Node [{int(recv)}] does not exist.")
                 return
-            recv = self.other_nodes[int(recv)].public_key if int(recv) != self.id else self.public_key
+            recv = self.other_nodes[int(recv)].public_key
 
         if recv == self.public_key and type != TransactionType.STAKE.value:
             print("Cannot send transaction to sender.")
@@ -148,18 +145,19 @@ class Node(NodeInfo):
             case _:
                 print("Invalid transaction type.")
                 return
-        if transaction_cost > self.bcc:
+        print(f"Total transaction cost: {transaction_cost}")
+
+        if transaction_cost > self.other_nodes[self.id].bcc:
             print(f"Transaction cannot proceed as the node does not have the required BCCs.")
             return
 
         # Balance updates
         if type == TransactionType.AMOUNT.value:
-            self.bcc -= transaction_cost
+            self.other_nodes[self.id].bcc -= transaction_cost
             recv_id = self.get_node_id_by_public_key(recv)
             self.other_nodes[recv_id].bcc += payload
-            logging.info(f"Node's BCCs have been decreased to {self.bcc}.")
         elif type == TransactionType.STAKE.value:
-            self.bcc -= transaction_cost
+            self.other_nodes[self.id].bcc -= transaction_cost
             self.stakes[self.id] = payload
 
         tx_request = self.tx_builder.create(recv, type, payload)
@@ -173,7 +171,7 @@ class Node(NodeInfo):
         b.set_hash()
 
         print("As the validator, I won {:.2f} in fees".format(b.fees()))
-        self.bcc += b.fees()
+        self.other_nodes[self.id].bcc += b.fees()
 
         print("Sending block!")
         # print(b.to_str())
@@ -193,7 +191,6 @@ class Node(NodeInfo):
         self.is_validator = (next_validator == self.public_key) 
 
     def stake(self, amount):
-        print(f"[Stub Method] Node {self.id} stakes {amount}")
         self.create_tx(str(Constants.BOOTSTRAP_ID), TransactionType.STAKE.value, amount)
 
     def view_block(self):
@@ -202,15 +199,21 @@ class Node(NodeInfo):
 
     def balance(self):
         print("")
-        print("Node   Balance  Stake")
-        print("---------------------")
+        print("Node   Balance  Stake    Total    Validated Stake")
+        print("-------------------------------------------------")
         # line example:
         #     "10 (*) 10999.99 53.26"
         for i in range(Constants.MAX_NODES):
-            if i == self.id:
-                print("{:<3d}(*) {:<8.2f} {:.2f}".format(i, self.bcc, self.stakes[i]))
-            else:
-                print("{:<6d} {:<8.2f} {:.2f}".format(i, self.other_nodes[i].bcc, self.stakes[i]))
+            c = "(*)" if i == self.id else "   "
+            total = self.other_nodes[i].bcc + self.stakes[i]
+            print("{:<3d}{} {:<8.2f} {:<8.2f} {:<8.2f} {:<8.2f}".format(
+                i,
+                c,
+                self.other_nodes[i].bcc,
+                self.stakes[i],
+                total,
+                self.validated_stakes[i]),
+            )
 
     def execute_cmd(self, line: str):
         # lstrip to remove leading whitespace, if any

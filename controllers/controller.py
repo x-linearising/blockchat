@@ -73,14 +73,10 @@ class NodeController:
         if tx_contents["type"] == TransactionType.STAKE.value:
             self.node.stakes[sender_id] = tx_contents["amount"]
         if tx_contents["type"] == TransactionType.AMOUNT.value:
+            self.node.get_node_info_by_public_key(tx_contents["recv_addr"]).bcc += tx_contents["amount"]
+
             if tx_contents["recv_addr"] == self.node.public_key:
-                self.node.bcc += tx_contents["amount"]
-                logging.info(f"Node's BCCs have increased to [{self.node.bcc}].")
-            else:
-                # recv_id = self.node.get_node_id_by_public_key(tx_contents["recv_addr"])
-                # self.node.other_nodes[recv_id].bcc += tx_contents["amount"]
-                self.node.get_node_info_by_public_key(tx_contents["recv_addr"]).bcc += tx_contents["amount"]
-                # logging.info(f"BCCs of node {recv_id} have increased to [{self.node.other_nodes[recv_id].bcc}].")
+                logging.info("I received {} BCC".format(tx_contents["amount"]))
 
         self.node.transactions.append(transaction_as_dict)
 
@@ -96,7 +92,7 @@ class NodeController:
         nodes_info = NodeListRequest.from_request_to_node_info_dict(request.json)
 
         # Removes itself from the list.
-        del nodes_info[self.node.id]
+        # del nodes_info[self.node.id]
 
         # Updating node list
         self.node.other_nodes = nodes_info
@@ -156,10 +152,7 @@ class NodeController:
         self.node.transactions = self.node.transactions[Constants.CAPACITY:]
 
         for staker_public_key, stake in b.stakes().items():
-            if staker_public_key == self.node.public_key:
-                self.node.validated_stakes[self.node.id] = stake
-            else:
-                self.node.validated_stakes[self.node.get_node_id_by_public_key(staker_public_key)] = stake
+            self.node.validated_stakes[self.node.get_node_id_by_public_key(staker_public_key)] = stake
             
         next_validator = self.node.next_validator()
         self.node.is_validator = next_validator == self.node.public_key 
