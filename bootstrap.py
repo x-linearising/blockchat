@@ -67,8 +67,7 @@ class Bootstrap(Node):
                                         payload=transfer_amount)
             self.transactions.append(tx)
             self.broadcast_request(tx, "/transactions")
-            self.transactions.append(tx)
             node.bcc += transfer_amount
-            self.bcc -= transfer_amount
+            self.bcc -= transfer_amount * Constants.TRANSFER_FEE_MULTIPLIER
 
 

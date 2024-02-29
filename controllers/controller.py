@@ -163,8 +163,11 @@ class BootstrapController(NodeController):
         self.validate_join_request(join_request)
 
         # Adding node
-        info_of_new_node = NodeInfo(join_request.ip_address, join_request.port, join_request.public_key)
-        self.node.other_nodes[self.nodes_counter] = info_of_new_node
+        self.node.other_nodes[self.nodes_counter] = NodeInfo(
+            join_request.ip_address,
+            join_request.port,
+            join_request.public_key
+        )
         logging.info(f"Node with id {self.nodes_counter} has been added to the network.")
 
         # Creating response
