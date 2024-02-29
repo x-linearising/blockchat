@@ -40,14 +40,17 @@ class Node(NodeInfo):
         self.is_validator = False
         self.transactions = []
         self.stakes = {}
+        self.validated_stakes = {}
         self.expected_nonce = {}
         self.blockchain = Blockchain()
 
     def initialize_stakes(self):
         self.stakes[self.id] = Constants.INITIAL_STAKE
+        self.validated_stakes[self.id] = Constants.INITIAL_STAKE
         self.bcc -= Constants.INITIAL_STAKE
         for node_id, node_info in self.other_nodes.items():
             self.stakes[node_id] = Constants.INITIAL_STAKE
+            self.validated_stakes[node_id] = Constants.INITIAL_STAKE
             self.other_nodes[node_id].bcc -= Constants.INITIAL_STAKE
         return self.stakes
 
@@ -103,8 +106,8 @@ class Node(NodeInfo):
     def next_validator(self):
 
         nodes = [i for i in range(Constants.MAX_NODES)]
-        
-        stakes = [self.stakes[i] for i in nodes]
+
+        stakes = [self.validated_stakes[i] for i in nodes]
         total_stake = sum(stakes)
 
         weights = [stakes[i]/total_stake for i in nodes]
@@ -179,6 +182,12 @@ class Node(NodeInfo):
         block_request = BlockRequest.from_block_to_request(b)
         self.blockchain.add(b)
         self.broadcast_request(block_request, '/blocks')
+
+        for staker_public_key, stake in b.stakes().items():
+            if staker_public_key == self.public_key:
+                self.validated_stakes[self.id] = stake
+            else:
+                self.validated_stakes[self.get_node_id_by_public_key(staker_public_key)] = stake
 
         next_validator = self.next_validator()
         self.is_validator = (next_validator == self.public_key) 

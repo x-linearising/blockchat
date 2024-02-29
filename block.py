@@ -82,7 +82,17 @@ class Block():
                 total_fees += tx_contents["amount"] * (Constants.TRANSFER_FEE_MULTIPLIER - 1)
 
         return total_fees
-        
+
+    def stakes(self):
+        stakes = {}
+        for tx in self.transactions:
+            tx_contents = tx["contents"]
+
+            if tx_contents["type"] == TransactionType.STAKE.value:
+                stakes[tx_contents["sender_addr"]] = tx_contents["amount"]
+
+        print(f"Stakes calculated from block {stakes}.")
+        return stakes
 
     def validate(self, val_pubkey, prev_hash):
         # my_hash = hash_dict(self.contents())
