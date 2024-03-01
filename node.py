@@ -43,6 +43,8 @@ class Node(NodeInfo):
         self.validated_stakes = {}
         self.expected_nonce = {}
         self.blockchain = Blockchain()
+        # Keep a list of which node (by id) validated each block for testing
+        self.validators = []
 
     def initialize_stakes(self):
         self.stakes[self.id] = Constants.INITIAL_STAKE
@@ -116,6 +118,7 @@ class Node(NodeInfo):
         tmp = random.choices(nodes, weights=weights, k=1)[0]
         
         print("next validator id:", tmp)
+        self.validators.append(tmp)
 
         if tmp == self.id:
             tmp = self.public_key
@@ -193,11 +196,20 @@ class Node(NodeInfo):
         self.is_validator = (next_validator == self.public_key) 
 
     def stake(self, amount):
-        print(f"[Stub Method] Node {self.id} stakes {amount}")
         self.create_tx(str(Constants.BOOTSTRAP_ID), TransactionType.STAKE.value, amount)
+        print(f"Node {self.id} stakes {amount}")
 
     def view_block(self):
         return self.blockchain.blocks[-1].to_str()
+
+    def dump_logs(self):
+        fname = "validators" + str(self.id) + ".txt"
+        with open(fname, "w") as f:
+            for v in self.validators:
+                f.write(str(v) + "\n")
+        fname = "blockchain" + str(self.id) + ".txt"
+        with open(fname, "w") as f:
+            f.write(self.blockchain.to_str(indent=0) + "\n")
 
     def balance(self):
         print("")
@@ -236,6 +248,7 @@ class Node(NodeInfo):
                 else:
                     s = self.view_block()
                 print(s)
+                print("validators: {}".format(self.validators))
             case "tx":
                 print("is_validator:", self.is_validator)
                 tabs = 1 * "\t"
@@ -250,6 +263,9 @@ class Node(NodeInfo):
                 print(s)
             case "balance":
                 self.balance()
+            case "logs":
+                self.dump_logs()
+                print("Dumped logs.")
             case  "help":
                 print("<help shown here>")
             case _:
