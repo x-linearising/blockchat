@@ -15,6 +15,12 @@ class Bootstrap(Node):
                          Constants.BOOTSTRAP_PORT,
                          Constants.BOOTSTRAP_ID,
                          Constants.BOOTSTRAP_PRIVKEY_PATH)
+        self.my_info = NodeInfo(
+            Constants.BOOTSTRAP_IP_ADDRESS,
+            Constants.BOOTSTRAP_PORT,
+            self.public_key
+        )
+        self.all_nodes[self.id] = self.my_info
         self.genesis()
 
     def genesis(self):

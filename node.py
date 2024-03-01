@@ -30,18 +30,14 @@ class Node:
     def __init__(self, ip_address, port, node_id=None, path=None):
         self.wallet = Wallet(path)
         self.tx_builder = TransactionBuilder(self.wallet)
-        # TODO: plain nodes (everyone except the bootstrap) overwrite this
-        # when recv'ing the node list. find a better way??
-        self.my_info = NodeInfo(ip_address, port, self.wallet.public_key)
         self.public_key = self.wallet.public_key
         self.all_nodes: dict[int, NodeInfo] = {}
 
         # Only the bootstrap node creates a Node object with known id
         if node_id is None:
-            self.join_network()  # TODO: Maybe move this in Controller?
+            self.join_network(ip_address, port, self.public_key)  # TODO: Maybe move this in Controller?
         else:
             self.id = node_id
-            self.all_nodes[self.id] = self.my_info
         
         self.is_validator = False
         self.transactions = []
@@ -67,7 +63,7 @@ class Node:
             if node_info.public_key == public_key:
                 return node_id
 
-    def join_network(self):
+    def join_network(self, ip, port, pubkey):
         """
         Makes a request to the boostrap node in order to join the network.
         If the join is successful, the node is assigned an id.
@@ -76,11 +72,7 @@ class Node:
         logging.info("Sending request to Boostrap Node to join the network.")
 
         # Make request to boostrap node
-        join_request = JoinRequest(
-            self.my_info.public_key,
-            self.my_info.ip_address,
-            self.my_info.port
-        )
+        join_request = JoinRequest(pubkey, ip, port)
 
         join_response = requests.post(
             Constants.BOOTSTRAP_URL + "/nodes",
