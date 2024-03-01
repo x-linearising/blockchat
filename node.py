@@ -197,8 +197,7 @@ class Node(NodeInfo):
         self.create_tx(str(Constants.BOOTSTRAP_ID), TransactionType.STAKE.value, amount)
 
     def view_block(self):
-        print("Last validated block:")
-        print(self.blockchain.blocks[-1].to_str())
+        return self.blockchain.blocks[-1].to_str()
 
     def balance(self):
         print("")
@@ -232,7 +231,11 @@ class Node(NodeInfo):
                 except ValueError:
                     print("[Error] Stake amount must be a number!")
             case "view":
-                self.view_block()
+                if len(items) > 1 and items[1] == "all":
+                    s = self.blockchain.to_str() 
+                else:
+                    s = self.view_block()
+                print(s)
             case "tx":
                 print("is_validator:", self.is_validator)
                 tabs = 1 * "\t"
