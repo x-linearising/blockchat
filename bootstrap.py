@@ -33,8 +33,6 @@ class Bootstrap(Node):
 
     def node_has_joined(self, ip_address, port):
         for node in self.all_nodes.values():
-            if node.ip_address == Constants.BOOTSTRAP_IP_ADDRESS and node.port == Constants.BOOTSTRAP_PORT:
-                continue
             if node.ip_address == ip_address and node.port == port:
                 return True
         return False
