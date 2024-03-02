@@ -1,6 +1,5 @@
 import json
 import struct
-from base64 import b64encode
 from socket import gethostname, gethostbyname
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
@@ -82,24 +81,16 @@ def to_deep_dict(obj):
     else:
         return obj
 
-# TODO: Make these methods, instead of class.
-class Hashable:
-    # Could make a constructor that initializes hash.
 
-    def get_as_bytes(self) -> bytes:
-        return string_to_bytes(self.get_hashable_part_as_string())
+def read_transaction_file(node_id):
+    receivers = []
+    messages = []
+    with open(f"input/trans{node_id}.txt", 'r') as file:
+        lines = file.readlines()
 
-    def get_hashable_part_as_string(self) -> str:
-        return json.dumps(self.get_hashable_part_as_dict())
+        for line in lines:
+            receivers.append(int(line[2:line.find(" ")]))
+            messages.append(line[line.find(" ") + 1:])
 
-    def get_hash(self):
-        return b64encode(sha256hash(self.get_as_bytes())).decode()
-
-    def get_hashable_part_as_dict(self):
-        return to_deep_dict(self)
-
-
-
-
-
+    return receivers, messages
 

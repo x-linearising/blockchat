@@ -39,6 +39,7 @@ controller = BootstrapController() if args.bootstrap else NodeController(myIP(),
 
 # Add routes / endpoints.
 app.register_blueprint(controller.blueprint, url_prefix='/')
+app.after_request(controller.after_request)
 
 t = Thread(target=user_interface, args=[controller.node, ""])
 t.start()

@@ -1,4 +1,3 @@
-import json
 import logging
 from threading import Thread
 from time import sleep
@@ -6,7 +5,6 @@ from flask import Blueprint, abort, request
 
 from node import Node, NodeInfo
 from bootstrap import Bootstrap
-from helper import tx_str
 from request_classes.block_request import BlockRequest
 from request_classes.blockchain_request import BlockchainRequest
 from request_classes.node_list_request import NodeListRequest
@@ -29,6 +27,16 @@ class NodeController:
         self.node = Node(ip_address, port)
         t2 = Thread(target=self.poll_capacity)
         t2.start()
+
+    def after_request(self, response):
+        request_path = request.path
+
+        @response.call_on_close
+        def process_after_request():
+            if request_path == '/nodes':
+                print("[Poll Thread] Bootstrap phase over. Executing file transactions...")
+                self.node.execute_file_transactions()
+        return response
 
     def receive_transaction(self):
         """
@@ -171,24 +179,26 @@ class BootstrapController(NodeController):
         self.blueprint.add_url_rule("/nodes", "nodes", self.add_node, methods=["POST"])
         self.blueprint.add_url_rule("/transactions", "transactions", self.receive_transaction, methods=["POST"])
         self.blueprint.add_url_rule("/blocks", "blocks", self.receive_block, methods=["POST"])
-        t = Thread(target=self.poll_node_count)
-        t.start()
         t2 = Thread(target=self.poll_capacity)
         t2.start()
 
-    def poll_node_count(self):
-        while True:
-            if self.is_bootstrapping_phase_over:
+
+    def after_request(self, response):
+        request_path = request.path
+
+        @response.call_on_close
+        def process_after_request():
+            if request_path == '/nodes' and self.is_bootstrapping_phase_over:
                 print("[Poll Thread] Bootstrap phase over. Broadcasting...")
                 self.node.broadcast_node_list()
                 self.node.broadcast_blockchain()
                 self.node.initialize_stakes()
                 next_validator = self.node.next_validator()
-                self.node.is_validator = next_validator == self.node.public_key 
+                self.node.is_validator = next_validator == self.node.public_key
                 self.node.perform_initial_transactions()
-                return
-            else:
-                sleep(1)
+                self.node.execute_file_transactions()
+
+        return response
 
 
     def add_node(self):

@@ -3,6 +3,7 @@ import time
 import random
 import requests
 
+import helper
 from helper import tx_str
 from block import Block
 from blockchain import Blockchain
@@ -199,6 +200,17 @@ class Node:
 
     def view_block(self):
         return self.blockchain.blocks[-1].to_str()
+
+    def execute_file_transactions(self):
+        receivers, messages = helper.read_transaction_file(self.id)
+        for receiver, message in zip(receivers, messages):
+            time.sleep(0.1 + random.random())
+
+            if receiver > Constants.MAX_NODES:
+                continue
+
+            self.create_tx(self.all_nodes[receiver].public_key, TransactionType.MESSAGE.value, message[:-1])
+
 
     def dump_logs(self):
         fname = "validators" + str(self.id) + ".txt"
