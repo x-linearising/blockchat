@@ -27,7 +27,7 @@ class Bootstrap(Node):
         genesis_tx = self.tx_builder.create(
             Constants.BOOTSTRAP_PUBKEY,
             TransactionType.AMOUNT.value,
-            Constants.STARTING_BCC_PER_NODE * Constants.MAX_NODES    
+            Constants.STARTING_BCC_PER_NODE * Constants.MAX_NODES
         )
 
         genesis_block = Block(0, time(), [genesis_tx], self.my_info.public_key, 1)
