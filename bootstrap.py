@@ -13,7 +13,14 @@ class Bootstrap(Node):
     def __init__(self):
         super().__init__(Constants.BOOTSTRAP_IP_ADDRESS,
                          Constants.BOOTSTRAP_PORT,
-                         Constants.BOOTSTRAP_ID)
+                         Constants.BOOTSTRAP_ID,
+                         Constants.BOOTSTRAP_PRIVKEY_PATH)
+        self.my_info = NodeInfo(
+            Constants.BOOTSTRAP_IP_ADDRESS,
+            Constants.BOOTSTRAP_PORT,
+            self.public_key
+        )
+        self.all_nodes[self.id] = self.my_info
         self.genesis()
 
     def genesis(self):
@@ -23,31 +30,25 @@ class Bootstrap(Node):
             Constants.STARTING_BCC_PER_NODE * Constants.MAX_NODES
         )
 
-        genesis_block = Block(0, time(), [genesis_tx], self.public_key, 1)
+        genesis_block = Block(0, time(), [genesis_tx], self.my_info.public_key, 1)
         genesis_block.set_hash()
         
         self.blockchain.add(genesis_block)
-        self.bcc = Constants.STARTING_BCC_PER_NODE * Constants.MAX_NODES
+        self.my_info.bcc = Constants.STARTING_BCC_PER_NODE * Constants.MAX_NODES
 
 
     def node_has_joined(self, ip_address, port):
-        for node in self.other_nodes.values():
+        for node in self.all_nodes.values():
             if node.ip_address == ip_address and node.port == port:
                 return True
         return False
 
     def broadcast_node_list(self):
-        # Adds itself to the list
-        complete_list = self.other_nodes.copy()
-        complete_list[self.id] = NodeInfo(self.ip_address,
-                                          self.port,
-                                          self.public_key,
-                                          self.bcc)
         # Send list to each node
-        node_list_request = NodeListRequest.from_node_info_dict_to_request(complete_list)
+        node_list_request = NodeListRequest.from_node_info_dict_to_request(self.all_nodes)
         self.broadcast_request(node_list_request, "/nodes")
 
-        for k in self.other_nodes.keys():
+        for k in self.all_nodes.keys():
             self.expected_nonce[k] = 0
 
         logging.info("Bootstrap phase complete. All nodes have received the participant list.")
@@ -61,9 +62,11 @@ class Bootstrap(Node):
     def perform_initial_transactions(self):
         """
         Performed at the end of bootstrapping phase. Transfers the starting BCC amount to each node of the network.
-
         """
-        for node in self.other_nodes.values():
+
+        for node_id, node in self.all_nodes.items():
+            if node_id == Constants.BOOTSTRAP_ID:
+                continue
             transfer_amount = Constants.STARTING_BCC_PER_NODE
             tx = self.tx_builder.create(recv_addr=node.public_key,
                                         trans_type=TransactionType.AMOUNT.value,
@@ -71,6 +74,6 @@ class Bootstrap(Node):
             self.transactions.append(tx)
             self.broadcast_request(tx, "/transactions")
             node.bcc += transfer_amount
-            self.bcc -= transfer_amount * Constants.TRANSFER_FEE_MULTIPLIER
+            self.my_info.bcc -= transfer_amount * Constants.TRANSFER_FEE_MULTIPLIER
 
 
