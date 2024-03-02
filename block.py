@@ -91,7 +91,7 @@ class Block():
             if tx_contents["type"] == TransactionType.STAKE.value:
                 stakes[tx_contents["sender_addr"]] = tx_contents["amount"]
 
-        print(f"Stakes calculated from block {stakes}.")
+        # print(f"Stakes calculated from block {stakes}.")
         return stakes
 
     def validate(self, val_pubkey, prev_hash):

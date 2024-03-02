@@ -38,9 +38,14 @@ class NodeController:
         # Extracting information from request
         transaction_as_dict = request.json
         tx_contents = transaction_as_dict["contents"]
+        
         sender_public_key = tx_contents["sender_addr"]
         sender_info = self.node.get_node_info_by_public_key(sender_public_key)
         sender_id = self.node.get_node_id_by_public_key(sender_public_key)
+        
+        recv_public_key = tx_contents["recv_addr"]
+        recv_info = self.node.get_node_info_by_public_key(recv_public_key)
+        recv_id = self.node.get_node_id_by_public_key(recv_public_key)
 
         # logging.info(f"Received transaction from Node {sender_id}.")
 
@@ -73,14 +78,11 @@ class NodeController:
         if tx_contents["type"] == TransactionType.STAKE.value:
             self.node.stakes[sender_id] = tx_contents["amount"]
         if tx_contents["type"] == TransactionType.AMOUNT.value:
-            if tx_contents["recv_addr"] == self.node.public_key:
-                self.node.bcc += tx_contents["amount"]
-                logging.info(f"Node's BCCs have increased to [{self.node.bcc}].")
-            else:
-                # recv_id = self.node.get_node_id_by_public_key(tx_contents["recv_addr"])
-                # self.node.other_nodes[recv_id].bcc += tx_contents["amount"]
-                self.node.get_node_info_by_public_key(tx_contents["recv_addr"]).bcc += tx_contents["amount"]
-                # logging.info(f"BCCs of node {recv_id} have increased to [{self.node.other_nodes[recv_id].bcc}].")
+            recv_info.bcc += tx_contents["amount"]
+
+            if recv_public_key == self.node.public_key:
+                print(f"My id: {self.node.id} Recv ID: {recv_id} My bcc: {self.node.my_info.bcc}")
+                logging.info("I received {} BCC".format(tx_contents["amount"]))
 
         self.node.transactions.append(transaction_as_dict)
 
@@ -90,22 +92,16 @@ class NodeController:
         """
         Endpoint hit by the bootstrap node, who sends the final list of nodes to all participating nodes.
         """
-        logging.info(f"Received NodeInfo for {len(request.json)} nodes.")
-
-        # Mapping request body to class
-        nodes_info = NodeListRequest.from_request_to_node_info_dict(request.json)
-
-        # Removes itself from the list.
-        del nodes_info[self.node.id]
 
         # Updating node list
-        self.node.other_nodes = nodes_info
-        logging.info("Node list has been updated successfully.")
+        self.node.all_nodes = NodeListRequest.from_request_to_node_info_dict(request.json)
+        self.node.my_info = self.node.all_nodes[self.node.id]
+        logging.info("[Bootstrap Phase] Received NodeInfo for {len(request.json)} nodes.")
 
         # Initialize stakes at predefined value
         self.node.initialize_stakes()
 
-        for k in nodes_info.keys():
+        for k in self.node.all_nodes.keys():
             self.node.expected_nonce[k] = 0
 
         # No need for response body. Responding with status 200.
@@ -150,16 +146,13 @@ class NodeController:
 
         val_id = self.node.get_node_id_by_public_key(b.validator)
         print("Giving {:.2f} to the validator".format(b.fees()))
-        self.node.other_nodes[val_id].bcc += b.fees()
+        self.node.all_nodes[val_id].bcc += b.fees()
 
         self.node.blockchain.add(b)
         self.node.transactions = self.node.transactions[Constants.CAPACITY:]
 
         for staker_public_key, stake in b.stakes().items():
-            if staker_public_key == self.node.public_key:
-                self.node.validated_stakes[self.node.id] = stake
-            else:
-                self.node.validated_stakes[self.node.get_node_id_by_public_key(staker_public_key)] = stake
+            self.node.validated_stakes[self.node.get_node_id_by_public_key(staker_public_key)] = stake
             
         next_validator = self.node.next_validator()
         self.node.is_validator = next_validator == self.node.public_key 
@@ -215,7 +208,7 @@ class BootstrapController(NodeController):
         self.validate_join_request(join_request)
 
         # Adding node
-        self.node.other_nodes[self.nodes_counter] = NodeInfo(
+        self.node.all_nodes[self.nodes_counter] = NodeInfo(
             join_request.ip_address,
             join_request.port,
             join_request.public_key

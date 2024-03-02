@@ -11,7 +11,8 @@ def user_interface(node, prompt_str=">>> "):
     while True:
         print(f"[Node {node.id}] Enter your command:")
         line = input(prompt_str)
-        node.execute_cmd(line)    
+        node.execute_cmd(line)
+        print("")
 
 app = Flask(__name__)
 api = Api(app)

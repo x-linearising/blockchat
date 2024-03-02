@@ -1,6 +1,5 @@
 from node import NodeInfo
 
-
 # TODO: This follows a different logic from other request classes. We could possibly fix this and
 #   have a common logic in our request classes.
 class NodeListRequest:
