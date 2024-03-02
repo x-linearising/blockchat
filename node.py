@@ -32,6 +32,7 @@ class Node:
         self.wallet = Wallet(path)
         self.tx_builder = TransactionBuilder(self.wallet)
         self.public_key = self.wallet.public_key
+        self.my_info = None
         self.all_nodes: dict[int, NodeInfo] = {}
 
         # Only the bootstrap node creates a Node object with known id
@@ -157,12 +158,11 @@ class Node:
             return
 
         # Balance updates
+        self.my_info.bcc -= transaction_cost
         if type == TransactionType.AMOUNT.value:
-            self.my_info.bcc -= transaction_cost
             recv_id = self.get_node_id_by_public_key(recv)
             self.all_nodes[recv_id].bcc += payload
         elif type == TransactionType.STAKE.value:
-            self.my_info.bcc -= transaction_cost
             self.stakes[self.id] = payload
 
         tx_request = self.tx_builder.create(recv, type, payload)
@@ -206,7 +206,7 @@ class Node:
         for receiver, message in zip(receivers, messages):
             time.sleep(0.1 + random.random())
 
-            if receiver > Constants.MAX_NODES:
+            if receiver > Constants.MAX_NODES - 1:
                 continue
 
             self.create_tx(self.all_nodes[receiver].public_key, TransactionType.MESSAGE.value, message[:-1])
