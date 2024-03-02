@@ -1,6 +1,4 @@
 import logging
-from threading import Thread
-from time import sleep
 from flask import Blueprint, abort, request
 
 from node import Node, NodeInfo
@@ -25,8 +23,6 @@ class NodeController:
         self.blueprint.add_url_rule("/transactions", "transaction", self.receive_transaction, methods=["POST"])
         self.blueprint.add_url_rule("/blocks", "blocks", self.receive_block, methods=["POST"])
         self.node = Node(ip_address, port)
-        t2 = Thread(target=self.poll_capacity)
-        t2.start()
 
     def after_request(self, response):
         request_path = request.path
@@ -36,6 +32,10 @@ class NodeController:
             if request_path == '/nodes':
                 print("[Poll Thread] Bootstrap phase over. Executing file transactions...")
                 self.node.execute_file_transactions()
+            elif request_path == '/transactions':
+                if self.node.is_validator and len(self.node.transactions) >= Constants.CAPACITY:
+                    print("Validator sends a block.")
+                    self.node.mint_block()
         return response
 
     def receive_transaction(self):
@@ -104,7 +104,7 @@ class NodeController:
         # Updating node list
         self.node.all_nodes = NodeListRequest.from_request_to_node_info_dict(request.json)
         self.node.my_info = self.node.all_nodes[self.node.id]
-        logging.info("[Bootstrap Phase] Received NodeInfo for {len(request.json)} nodes.")
+        logging.info(f"[Bootstrap Phase] Received NodeInfo for {len(request.json)} nodes.")
 
         # Initialize stakes at predefined value
         self.node.initialize_stakes()
@@ -135,14 +135,6 @@ class NodeController:
 
         # No need for response body. Responding with status 200.
         return '', 200
-
-    def poll_capacity(self):
-        while True:
-            if self.node.is_validator and len(self.node.transactions) >= Constants.CAPACITY:
-                print("Validator sends a block.")
-                self.node.mint_block()
-            else:
-                sleep(1)
 
     def receive_block(self):
         b = BlockRequest.from_request_to_block(request.json)
@@ -179,8 +171,6 @@ class BootstrapController(NodeController):
         self.blueprint.add_url_rule("/nodes", "nodes", self.add_node, methods=["POST"])
         self.blueprint.add_url_rule("/transactions", "transactions", self.receive_transaction, methods=["POST"])
         self.blueprint.add_url_rule("/blocks", "blocks", self.receive_block, methods=["POST"])
-        t2 = Thread(target=self.poll_capacity)
-        t2.start()
 
 
     def after_request(self, response):
@@ -188,7 +178,7 @@ class BootstrapController(NodeController):
 
         @response.call_on_close
         def process_after_request():
-            if request_path == '/nodes' and self.is_bootstrapping_phase_over:
+            if request_path == '/nodes' and self.nodes_counter == Constants.MAX_NODES:
                 print("[Poll Thread] Bootstrap phase over. Broadcasting...")
                 self.node.broadcast_node_list()
                 self.node.broadcast_blockchain()
@@ -229,15 +219,10 @@ class BootstrapController(NodeController):
         response = JoinResponse(self.nodes_counter)
         self.nodes_counter += 1
 
-        # Check if every expected node has joined
-        if self.nodes_counter == Constants.MAX_NODES:
-            self.is_bootstrapping_phase_over = True
-            print("<i should broadcast now>")
-
         return response.to_dict()
 
     def validate_join_request(self, join_request: JoinRequest):
-        if self.is_bootstrapping_phase_over:
+        if self.nodes_counter == Constants.MAX_NODES:
             log_message = "Bad request: Bootstrapping phase is over."
             logging.warning(log_message)
             abort(400, description=log_message)

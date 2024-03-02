@@ -169,6 +169,10 @@ class Node:
         self.broadcast_request(tx_request, "/transactions")
         self.transactions.append(tx_request)
 
+        if self.is_validator and len(self.transactions) >= Constants.CAPACITY:
+            print("Validator sends a block.")
+            self.mint_block()
+
     def mint_block(self):
         prev_block = self.blockchain.blocks[-1]
         b = Block(prev_block.idx+1, time.time(), self.transactions[:Constants.CAPACITY], self.public_key, prev_block.block_hash)
