@@ -8,6 +8,7 @@ from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives.serialization import load_ssh_public_key
 
 import wallet
+from constants import Constants
 from helper import sha256hash, dict_bytes
 
 
@@ -92,6 +93,20 @@ def verify_tx(tx, expected_nonce) -> bool:
     except InvalidSignature: 
         print("[Received Transaction] Invalid signature detected!")
         return False
+
+
+def tx_cost(tx_contents, sender_stakes):
+    # Transaction Cost
+    match tx_contents["type"]:
+        case TransactionType.MESSAGE.value:
+            transaction_cost = len(tx_contents["message"])
+        case TransactionType.AMOUNT.value:
+            transaction_cost = tx_contents["amount"] * Constants.TRANSFER_FEE_MULTIPLIER
+        case TransactionType.STAKE.value:
+            transaction_cost = tx_contents["amount"] - sender_stakes  # This could very well be negative
+        case _:
+            transaction_cost = None
+    return transaction_cost
 
 
 if __name__ == "__main__":

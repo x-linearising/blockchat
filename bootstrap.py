@@ -22,7 +22,8 @@ class Bootstrap(Node):
         )
         self.all_nodes[self.id] = self.my_info
         self.genesis()
-        self.val_bcc = {i : Constants.STARTING_BCC_PER_NODE for i in range(Constants.MAX_NODES)}
+        self.val_bcc = {i : 0 for i in range(self.id + 1, Constants.MAX_NODES)}
+        self.val_bcc[self.id] = Constants.STARTING_BCC_PER_NODE * Constants.MAX_NODES
 
     def genesis(self):
         genesis_tx = self.tx_builder.create(

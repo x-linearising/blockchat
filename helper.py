@@ -70,18 +70,6 @@ def tx_str(tx, summarized=True, indent=1):
     s += tabs + "nonce: {}\n".format(tx["contents"]["nonce"])
     return s
 
-
-def to_deep_dict(obj):
-    if isinstance(obj, dict):
-        return {k: to_deep_dict(v) for k, v in obj.items()}
-    elif hasattr(obj, '__dict__'):
-        return to_deep_dict(vars(obj))
-    elif isinstance(obj, list):
-        return [to_deep_dict(item) for item in obj]
-    else:
-        return obj
-
-
 def read_transaction_file(node_id):
     receivers = []
     messages = []

@@ -9,7 +9,7 @@ from request_classes.node_list_request import NodeListRequest
 from request_classes.join_request import JoinRequest
 from response_classes.join_response import JoinResponse
 from constants import Constants
-from transaction import verify_tx, TransactionType
+from transaction import TransactionType, verify_tx, tx_cost 
 
 
 class NodeController:
@@ -38,19 +38,6 @@ class NodeController:
                     self.node.mint_block()
         return response
 
-    def tx_cost(self, tx_contents, sender_stakes):
-        # Transaction Cost
-        match tx_contents["type"]:
-            case TransactionType.MESSAGE.value:
-                transaction_cost = len(tx_contents["message"])
-            case TransactionType.AMOUNT.value:
-                transaction_cost = tx_contents["amount"] * Constants.TRANSFER_FEE_MULTIPLIER
-            case TransactionType.STAKE.value:
-                transaction_cost = tx_contents["amount"] - sender_stakes  # This could be very well be negative
-            case _:
-                transaction_cost = None
-                logging.warning("Invalid transaction type was detected.")
-        return transaction_cost
 
     def receive_transaction(self):
         """
@@ -72,7 +59,9 @@ class NodeController:
         # logging.info(f"Received transaction from Node {sender_id}.")
 
         # Transaction Cost
-        transaction_cost = self.tx_cost(tx_contents, self.node.stakes[sender_id])
+        transaction_cost = tx_cost(tx_contents, self.node.stakes[sender_id])
+        if transaction_cost is None:
+            logging.warning("Invalid transaction type was detected.")
 
         # Transaction validations
         if not verify_tx(transaction_as_dict, self.node.expected_nonce[sender_id]):
@@ -97,7 +86,8 @@ class NodeController:
                 print(f"My id: {self.node.id} Recv ID: {recv_id} My bcc: {self.node.my_info.bcc}")
                 logging.info("I received {} BCC".format(tx_contents["amount"]))
 
-        # self.node.transactions.append(transaction_as_dict)
+        if transaction_as_dict["hash"] not in self.node.pending_tx:
+            self.node.transactions.append(transaction_as_dict)
 
 
         return '', 200
@@ -154,19 +144,28 @@ class NodeController:
         val_id = self.node.get_node_id_by_public_key(b.validator)
         print("Giving {:.2f} to the validator".format(b.fees()))
         self.node.all_nodes[val_id].bcc += b.fees()
-
         self.node.blockchain.add(b)
-        # we loop through the txs that exist in the current validated block, but not in receiver's list
-        for tx in list(set(b.transactions) - set(self.node.transactions)):
+
+        # If the block contains a tx that this node hasn't received, add its
+        # hash to the pending_tx list.
+        for tx in [i for i in b.transactions if i not in self.node.transactions]:
             self.node.pending_tx.append(tx['hash'])
-        # txs that exist in the receiver's list, but not in current validated block
-        self.node.transactions = list(set(self.node.transactions) - set(b.transactions))
+        
+        # Remove txs included in the block from this node's list
+        self.node.transactions = [i for i in self.node.transactions if i not in b.transactions]
 
         # validated BCCs
         for tx in b.transactions:
-            sender_public_key = tx['contents']["sender_addr"]
-            sender_id = self.node.get_node_id_by_public_key(sender_public_key)
-            self.node.val_bcc[sender_id] -= self.tx_cost(tx['contents'], self.node.validated_stakes[sender_id])
+            sender_pubkey = tx["contents"]["sender_addr"]
+            sender_id = self.node.get_node_id_by_public_key(sender_pubkey)
+            self.node.val_bcc[sender_id] -= tx_cost(tx['contents'], self.node.validated_stakes[sender_id])
+            if tx["contents"]["type"] == TransactionType.STAKE.value:
+                self.node.validated_stakes[sender_id] = tx["contents"]["amount"]
+            if tx["contents"]["type"] == TransactionType.AMOUNT.value:
+                recv_pubkey = tx["contents"]["recv_addr"]
+                recv_id = self.node.get_node_id_by_public_key(recv_pubkey)
+                self.node.val_bcc[recv_id] += tx["contents"]["amount"]
+        
         self.node.val_bcc[val_id] += b.fees()
 
         for staker_public_key, stake in b.stakes().items():
@@ -176,7 +175,6 @@ class NodeController:
         self.node.is_validator = next_validator == self.node.public_key
 
         return "", 200
-
 
 class BootstrapController(NodeController):
 

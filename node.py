@@ -12,7 +12,7 @@ from request_classes.block_request import BlockRequest
 from request_classes.join_request import JoinRequest
 from response_classes.join_response import JoinResponse
 from wallet import Wallet
-from transaction import TransactionBuilder, TransactionType
+from transaction import TransactionBuilder, TransactionType, tx_cost
 
 
 class NodeInfo:
@@ -36,6 +36,11 @@ class Node:
         self.all_nodes: dict[int, NodeInfo] = {}
         self.pending_tx = []
         self.val_bcc = {}
+        
+        # Move this where the genesis block is received!!
+        if node_id is None:
+            self.val_bcc = {i : 0 for i in range(1, Constants.MAX_NODES)}
+            self.val_bcc[0] = Constants.STARTING_BCC_PER_NODE * Constants.MAX_NODES
 
         # Only the bootstrap node creates a Node object with known id
         if node_id is None:
@@ -111,7 +116,6 @@ class Node:
                 logging.error(f"Request to node {node_id} failed with status code: {response.status_code}.")
 
     def next_validator(self):
-
         nodes = [i for i in range(Constants.MAX_NODES)]
 
         stakes = [self.validated_stakes[i] for i in nodes]
@@ -177,25 +181,38 @@ class Node:
 
     def mint_block(self):
         prev_block = self.blockchain.blocks[-1]
-        b = Block(prev_block.idx+1, time.time(), self.transactions[:Constants.CAPACITY], self.public_key, prev_block.block_hash)
+        block_txs = self.transactions[:Constants.CAPACITY]
+        self.transactions = self.transactions[Constants.CAPACITY:]
+
+        b = Block(prev_block.idx+1, time.time(), block_txs, self.public_key, prev_block.block_hash)
         b.set_hash()
 
-        print("As the validator, I won {:.2f} in fees".format(b.fees()))
-        self.my_info.bcc += b.fees()
+        for tx in block_txs:
+            tx_contents = tx["contents"]
 
-        print("Sending block!")
+            sender_id = self.get_node_id_by_public_key(tx_contents["sender_addr"])
+            self.val_bcc[sender_id] -= tx_cost(tx_contents, self.validated_stakes[sender_id])
+
+            if tx_contents["type"] == TransactionType.STAKE.value:
+                self.validated_stakes[sender_id] = tx_contents["amount"]
+            if tx["contents"]["type"] == TransactionType.AMOUNT.value:
+                recv_pubkey = tx["contents"]["recv_addr"]
+                recv_id = self.get_node_id_by_public_key(recv_pubkey)
+                self.val_bcc[recv_id] += tx_contents["amount"]
+
+        # for staker_public_key, stake in b.stakes().items():
+        #     if staker_public_key == self.public_key:
+        #         self.validated_stakes[self.id] = stake
+        #     else:
+        #         self.validated_stakes[self.get_node_id_by_public_key(staker_public_key)] = stake
+
+        print("As the validator, I won {:.2f} in fees. Sending block...".format(b.fees()))
+        self.my_info.bcc += b.fees()
         # print(b.to_str())
 
-        self.transactions = self.transactions[Constants.CAPACITY:]
         block_request = BlockRequest.from_block_to_request(b)
         self.blockchain.add(b)
         self.broadcast_request(block_request, '/blocks')
-
-        for staker_public_key, stake in b.stakes().items():
-            if staker_public_key == self.public_key:
-                self.validated_stakes[self.id] = stake
-            else:
-                self.validated_stakes[self.get_node_id_by_public_key(staker_public_key)] = stake
 
         next_validator = self.next_validator()
         self.is_validator = (next_validator == self.public_key) 
@@ -229,19 +246,20 @@ class Node:
 
     def balance(self):
         print("")
-        print("Node   Balance  Stake    Total    Validated Stake")
-        print("-------------------------------------------------")
+        print("Node   Balance  Stake    Total    Val. Balance  Val. Stake   ")
+        print("------------------------------------------------------------")
         # line example:
         #     "10 (*) 10999.99 53.26"
         for i in range(Constants.MAX_NODES):
             c = "(*)" if i == self.id else "   "
             total = self.all_nodes[i].bcc + self.stakes[i]
-            print("{:<3d}{} {:<8.2f} {:<8.2f} {:<8.2f} {:<8.2f}".format(
+            print("{:<3d}{} {:<8.2f} {:<8.2f} {:<8.2f} {:<12.2f}  {:<8.2f}".format(
                 i,
                 c,
                 self.all_nodes[i].bcc,
                 self.stakes[i],
                 total,
+                self.val_bcc[i],
                 self.validated_stakes[i]),
             )
 
