@@ -43,5 +43,4 @@ app.after_request(controller.after_request)
 
 t = Thread(target=user_interface, args=[controller.node, ""])
 t.start()
-print(f"Bootstrap has joined the network.")
 app.run(host="0.0.0.0", port=Constants.BOOTSTRAP_PORT if args.bootstrap else args.port)

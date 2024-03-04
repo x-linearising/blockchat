@@ -125,8 +125,6 @@ class Node:
         total_stake = sum(stakes)
 
         weights = [stakes[i]/total_stake for i in nodes]
-        # print("Finding next validator with probabilities:")
-        # print(weights)
 
         random.seed(self.blockchain.blocks[-1].block_hash)
         i = random.choices(nodes, weights=weights, k=1)[0]
@@ -182,40 +180,34 @@ class Node:
             self.mint_block()
 
     def mint_block(self):
+        """
+        Method called by the validator node.
+        Remove the oldest `capacity` received transactions, create a block from
+        them and send it to the rest of the nodes.
+        """
         prev_block = self.blockchain.blocks[-1]
         block_txs = self.transactions[:Constants.CAPACITY]
+        # Prune txs added to the block from this node's list
         self.transactions = self.transactions[Constants.CAPACITY:]
 
         b = Block(prev_block.idx+1, time.time(), block_txs, self.public_key, prev_block.block_hash)
         b.set_hash()
 
+        # Updated the amount of validated BCCs for each node.
         for tx in block_txs:
-            tx_contents = tx["contents"]
+            sender_id = self.get_node_id_by_public_key(tx["contents"]["sender_addr"])
+            self.val_bcc[sender_id] -= tx_cost(tx["contents"], self.validated_stakes[sender_id])
 
-            sender_id = self.get_node_id_by_public_key(tx_contents["sender_addr"])
-            self.val_bcc[sender_id] -= tx_cost(tx_contents, self.validated_stakes[sender_id])
 
-            # print("[send block] val_bcc[{}] decreases by {}.".format(sender_id, tx_cost(tx_contents, self.validated_stakes[sender_id])))
-
-            if tx_contents["type"] == TransactionType.STAKE.value:
-                self.validated_stakes[sender_id] = tx_contents["amount"]
+            if tx["contents"]["type"] == TransactionType.STAKE.value:
+                self.validated_stakes[sender_id] = tx["contents"]["amount"]
             if tx["contents"]["type"] == TransactionType.AMOUNT.value:
                 recv_pubkey = tx["contents"]["recv_addr"]
                 recv_id = self.get_node_id_by_public_key(recv_pubkey)
-                self.val_bcc[recv_id] += tx_contents["amount"]
+                self.val_bcc[recv_id] += tx["contents"]["amount"]
 
-                # print("[send block] val_bcc[{}] increases by {}.".format(recv_id, tx_contents["amount"]))
-                
-
-        # for staker_public_key, stake in b.stakes().items():
-        #     if staker_public_key == self.public_key:
-        #         self.validated_stakes[self.id] = stake
-        #     else:
-        #         self.validated_stakes[self.get_node_id_by_public_key(staker_public_key)] = stake
-
-        print("As the validator, I won {:.2f} in fees. Sending block...".format(b.fees()))
+        # print("As the validator, I won {:.2f} in fees. Sending block...".format(b.fees()))
         self.my_info.bcc += b.fees()
-        print("[send block] val_bcc[{}] increases by {}".format(self.id, b.fees()))
         self.val_bcc[self.id] += b.fees()
         # print(b.to_str())
 

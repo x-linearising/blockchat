@@ -134,16 +134,19 @@ class NodeController:
         return '', 200
 
     def receive_block(self):
+        """
+        Called when this node receives a request at the "/blocks" endpoint.
+        After checking that the block is valid, adds it to the blockchain
+        and calculates the next expected validator.
+        """
         b = BlockRequest.from_request_to_block(request.json)
-
-        print("Received block!")
-
         if not b.validate(b.validator, b.prev_hash):
             return " ", 400
 
         val_id = self.node.get_node_id_by_public_key(b.validator)
-        print("Giving {:.2f} to the validator".format(b.fees()))
         self.node.all_nodes[val_id].bcc += b.fees()
+        logging.info("Giving {:.2f} to the validator".format(b.fees()))
+        
         self.node.blockchain.add(b)
 
         # If the block contains a tx that this node hasn't received, add its
@@ -154,26 +157,21 @@ class NodeController:
         # Remove txs included in the block from this node's list
         self.node.transactions = [i for i in self.node.transactions if i not in b.transactions]
 
-        # validated BCCs
+        # Update val_bcc according to the txs in the block 
         for tx in b.transactions:
             sender_pubkey = tx["contents"]["sender_addr"]
             sender_id = self.node.get_node_id_by_public_key(sender_pubkey)
+            
             self.node.val_bcc[sender_id] -= tx_cost(tx['contents'], self.node.validated_stakes[sender_id])
-            # print("[recv block] val_bcc[{}] decreases by {}.".format(sender_id, tx_cost(tx['contents'], self.node.validated_stakes[sender_id])))
             if tx["contents"]["type"] == TransactionType.STAKE.value:
                 self.node.validated_stakes[sender_id] = tx["contents"]["amount"]
             if tx["contents"]["type"] == TransactionType.AMOUNT.value:
                 recv_pubkey = tx["contents"]["recv_addr"]
                 recv_id = self.node.get_node_id_by_public_key(recv_pubkey)
                 self.node.val_bcc[recv_id] += tx["contents"]["amount"]
-
-                # print("[recv block] val_bcc[{}] increases by {}.".format(recv_id, tx["contents"]["amount"]))
         
         self.node.val_bcc[val_id] += b.fees()
 
-        for staker_public_key, stake in b.stakes().items():
-            self.node.validated_stakes[self.node.get_node_id_by_public_key(staker_public_key)] = stake
-            
         next_validator = self.node.next_validator()
         self.node.is_validator = next_validator == self.node.public_key
 
