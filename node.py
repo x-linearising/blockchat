@@ -105,6 +105,8 @@ class Node:
             if node_id == self.id:
                 continue
 
+            # print("Broadcasting request to {}".format(node_id))
+
             response = requests.post(node.get_node_url() + endpoint,
                                      json=request_body,
                                      headers=Constants.JSON_HEADER)
@@ -193,12 +195,17 @@ class Node:
             sender_id = self.get_node_id_by_public_key(tx_contents["sender_addr"])
             self.val_bcc[sender_id] -= tx_cost(tx_contents, self.validated_stakes[sender_id])
 
+            # print("[send block] val_bcc[{}] decreases by {}.".format(sender_id, tx_cost(tx_contents, self.validated_stakes[sender_id])))
+
             if tx_contents["type"] == TransactionType.STAKE.value:
                 self.validated_stakes[sender_id] = tx_contents["amount"]
             if tx["contents"]["type"] == TransactionType.AMOUNT.value:
                 recv_pubkey = tx["contents"]["recv_addr"]
                 recv_id = self.get_node_id_by_public_key(recv_pubkey)
                 self.val_bcc[recv_id] += tx_contents["amount"]
+
+                # print("[send block] val_bcc[{}] increases by {}.".format(recv_id, tx_contents["amount"]))
+                
 
         # for staker_public_key, stake in b.stakes().items():
         #     if staker_public_key == self.public_key:
@@ -208,6 +215,8 @@ class Node:
 
         print("As the validator, I won {:.2f} in fees. Sending block...".format(b.fees()))
         self.my_info.bcc += b.fees()
+        print("[send block] val_bcc[{}] increases by {}".format(self.id, b.fees()))
+        self.val_bcc[self.id] += b.fees()
         # print(b.to_str())
 
         block_request = BlockRequest.from_block_to_request(b)
@@ -290,7 +299,8 @@ class Node:
                 print(s)
                 print("validators: {}".format(self.validators))
             case "tx":
-                print("is_validator:", self.is_validator)
+                len_sum = 0
+                # print("is_validator:", self.is_validator)
                 tabs = 1 * "\t"
 
                 s = tabs + f"transactions: [\n"
@@ -299,8 +309,11 @@ class Node:
                     s += tx_str(tx, True, 2)
                     if i != len(self.transactions) - 1:
                         s += "\n"
+                    if tx["contents"]["type"] == TransactionType.MESSAGE.value:
+                        len_sum += len(tx["contents"]["message"])
                 s += tabs + "]"
                 print(s)
+                print(f"Sum of lengths of messages = {len_sum}")
             case "balance":
                 self.balance()
             case "logs":

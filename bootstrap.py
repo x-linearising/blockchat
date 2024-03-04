@@ -69,6 +69,8 @@ class Bootstrap(Node):
         for node_id, node in self.all_nodes.items():
             if node_id == Constants.BOOTSTRAP_ID:
                 continue
+            
+            # print("Sending initial bcc to {}".format(node_id))
             transfer_amount = Constants.STARTING_BCC_PER_NODE
             tx = self.tx_builder.create(recv_addr=node.public_key,
                                         trans_type=TransactionType.AMOUNT.value,

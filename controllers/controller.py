@@ -159,12 +159,15 @@ class NodeController:
             sender_pubkey = tx["contents"]["sender_addr"]
             sender_id = self.node.get_node_id_by_public_key(sender_pubkey)
             self.node.val_bcc[sender_id] -= tx_cost(tx['contents'], self.node.validated_stakes[sender_id])
+            # print("[recv block] val_bcc[{}] decreases by {}.".format(sender_id, tx_cost(tx['contents'], self.node.validated_stakes[sender_id])))
             if tx["contents"]["type"] == TransactionType.STAKE.value:
                 self.node.validated_stakes[sender_id] = tx["contents"]["amount"]
             if tx["contents"]["type"] == TransactionType.AMOUNT.value:
                 recv_pubkey = tx["contents"]["recv_addr"]
                 recv_id = self.node.get_node_id_by_public_key(recv_pubkey)
                 self.node.val_bcc[recv_id] += tx["contents"]["amount"]
+
+                # print("[recv block] val_bcc[{}] increases by {}.".format(recv_id, tx["contents"]["amount"]))
         
         self.node.val_bcc[val_id] += b.fees()
 
