@@ -38,6 +38,20 @@ class NodeController:
                     self.node.mint_block()
         return response
 
+    def tx_cost(self, tx_contents, sender_stakes):
+        # Transaction Cost
+        match tx_contents["type"]:
+            case TransactionType.MESSAGE.value:
+                transaction_cost = len(tx_contents["message"])
+            case TransactionType.AMOUNT.value:
+                transaction_cost = tx_contents["amount"] * Constants.TRANSFER_FEE_MULTIPLIER
+            case TransactionType.STAKE.value:
+                transaction_cost = tx_contents["amount"] - sender_stakes  # This could be very well be negative
+            case _:
+                transaction_cost = None
+                logging.warning("Invalid transaction type was detected.")
+        return transaction_cost
+
     def receive_transaction(self):
         """
         Endpoint hit by a node broadcasting a transaction.
@@ -58,16 +72,7 @@ class NodeController:
         # logging.info(f"Received transaction from Node {sender_id}.")
 
         # Transaction Cost
-        match tx_contents["type"]:
-            case TransactionType.MESSAGE.value:
-                transaction_cost = len(tx_contents["message"])
-            case TransactionType.AMOUNT.value:
-                transaction_cost = tx_contents["amount"] * Constants.TRANSFER_FEE_MULTIPLIER
-            case TransactionType.STAKE.value:
-                transaction_cost = tx_contents["amount"] - self.node.stakes[sender_id]  # This could be very well be negative
-            case _:
-                logging.warning("Invalid transaction type was detected.")
-                return "Invalid transaction type", 400
+        transaction_cost = self.tx_cost(tx_contents, self.node.stakes[sender_id])
 
         # Transaction validations
         if not verify_tx(transaction_as_dict, self.node.expected_nonce[sender_id]):
@@ -92,7 +97,8 @@ class NodeController:
                 print(f"My id: {self.node.id} Recv ID: {recv_id} My bcc: {self.node.my_info.bcc}")
                 logging.info("I received {} BCC".format(tx_contents["amount"]))
 
-        self.node.transactions.append(transaction_as_dict)
+        # self.node.transactions.append(transaction_as_dict)
+
 
         return '', 200
 
@@ -103,6 +109,7 @@ class NodeController:
 
         # Updating node list
         self.node.all_nodes = NodeListRequest.from_request_to_node_info_dict(request.json)
+        self.node.val_bcc = {node_id: node_info.bcc for node_id, node_info in self.node.all_nodes.items()}
         self.node.my_info = self.node.all_nodes[self.node.id]
         logging.info(f"[Bootstrap Phase] Received NodeInfo for {len(request.json)} nodes.")
 
@@ -149,13 +156,25 @@ class NodeController:
         self.node.all_nodes[val_id].bcc += b.fees()
 
         self.node.blockchain.add(b)
-        self.node.transactions = self.node.transactions[Constants.CAPACITY:]
+        # we loop through the txs that exist in the current validated block, but not in receiver's list
+        for tx in list(set(b.transactions) - set(self.node.transactions)):
+            self.node.pending_tx.append(tx['hash'])
+        # txs that exist in the receiver's list, but not in current validated block
+        self.node.transactions = list(set(self.node.transactions) - set(b.transactions))
+
+        # validated BCCs
+        for tx in b.transactions:
+            sender_public_key = tx['contents']["sender_addr"]
+            sender_id = self.node.get_node_id_by_public_key(sender_public_key)
+            self.node.val_bcc[sender_id] -= self.tx_cost(tx['contents'], self.node.validated_stakes[sender_id])
+        self.node.val_bcc[val_id] += b.fees()
 
         for staker_public_key, stake in b.stakes().items():
             self.node.validated_stakes[self.node.get_node_id_by_public_key(staker_public_key)] = stake
             
         next_validator = self.node.next_validator()
-        self.node.is_validator = next_validator == self.node.public_key 
+        self.node.is_validator = next_validator == self.node.public_key
+
         return "", 200
 
 

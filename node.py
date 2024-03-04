@@ -34,6 +34,8 @@ class Node:
         self.public_key = self.wallet.public_key
         self.my_info = None
         self.all_nodes: dict[int, NodeInfo] = {}
+        self.pending_tx = []
+        self.val_bcc = {}
 
         # Only the bootstrap node creates a Node object with known id
         if node_id is None:
