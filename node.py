@@ -2,6 +2,7 @@ import logging
 import time
 import random
 import requests
+from functools import reduce
 
 import helper
 from helper import tx_str
@@ -247,22 +248,31 @@ class Node:
 
     def balance(self):
         print("")
-        print("Node   Balance  Stake    Total    Val. Balance  Val. Stake   ")
-        print("------------------------------------------------------------")
+        print("Node   Balance   Stake   Total   Val. Balance   Val. Stake")
+        print("==========================================================")
         # line example:
         #     "10 (*) 10999.99 53.26"
+        total = []
         for i in range(Constants.MAX_NODES):
             c = "(*)" if i == self.id else "   "
-            total = self.all_nodes[i].bcc + self.stakes[i]
-            print("{:<3d}{} {:<8.2f} {:<8.2f} {:<8.2f} {:<12.2f}  {:<8.2f}".format(
+            total.append(self.all_nodes[i].bcc + self.stakes[i])
+            print("{:<3d}{} {:<7.2f}   {:<7.2f} {:<7.2f} {:<14.2f} {:<9.2f}".format(
                 i,
                 c,
                 self.all_nodes[i].bcc,
                 self.stakes[i],
-                total,
+                total[i],
                 self.val_bcc[i],
                 self.validated_stakes[i]),
             )
+        print("------------------------------------------------------------>(+)")
+        print("Total  {:<7.2f}   {:<7.2f} {:<7.2f} {:<14.2f} {:<9.2f}".format(
+            reduce(lambda x,y: x+y, map(lambda d: d.bcc, self.all_nodes.values())),
+            reduce(lambda x,y: x+y, self.stakes.values()),
+            reduce(lambda x,y: x+y, total),
+            reduce(lambda x,y: x+y, self.val_bcc.values()),
+            reduce(lambda x,y: x+y, self.validated_stakes.values())
+        ))
 
     def execute_cmd(self, line: str):
         # lstrip to remove leading whitespace, if any
