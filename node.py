@@ -246,6 +246,16 @@ class Node:
         with open(fname, "w") as f:
             f.write(self.blockchain.to_str(indent=0) + "\n")
 
+    def waiting_tx_fees(self):
+        fees = 0
+        for tx in self.transactions:
+            match tx["contents"]["type"]:
+                case TransactionType.AMOUNT.value:
+                    fees += tx["contents"]["amount"] * (1 - Constants.TRANSFER_FEE_MULTIPLIER)
+                case TransactionType.MESSAGE.value:
+                    fees += len(tx["contents"]["message"])
+        return fees
+
     def balance(self):
         print("")
         print("Node   Balance   Stake   Total   Val. Balance   Val. Stake")
@@ -273,6 +283,8 @@ class Node:
             reduce(lambda x,y: x+y, self.val_bcc.values()),
             reduce(lambda x,y: x+y, self.validated_stakes.values())
         ))
+        print("Next val. will earn      {:<7.2f}".format(self.waiting_tx_fees()))
+        print("Total circulating BCCs:  {:<7.2f}".format(sum(total) + self.waiting_tx_fees()))
 
     def execute_cmd(self, line: str):
         # lstrip to remove leading whitespace, if any
