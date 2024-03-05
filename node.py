@@ -279,7 +279,7 @@ class Node:
         print("Total  {:<7.2f}   {:<7.2f} {:<7.2f} {:<14.2f} {:<9.2f}".format(
             reduce(lambda x,y: x+y, map(lambda d: d.bcc, self.all_nodes.values())),
             reduce(lambda x,y: x+y, self.stakes.values()),
-            reduce(lambda x,y: x+y, total),
+            sum(total),
             reduce(lambda x,y: x+y, self.val_bcc.values()),
             reduce(lambda x,y: x+y, self.validated_stakes.values())
         ))
