@@ -88,6 +88,8 @@ class NodeController:
 
         if transaction_as_dict["hash"] not in self.node.pending_tx:
             self.node.transactions.append(transaction_as_dict)
+        else:
+            self.node.pending_tx.remove(transaction_as_dict["hash"])
 
 
         return '', 200
@@ -152,7 +154,7 @@ class NodeController:
         # If the block contains a tx that this node hasn't received, add its
         # hash to the pending_tx list.
         for tx in [i for i in b.transactions if i not in self.node.transactions]:
-            self.node.pending_tx.append(tx['hash'])
+            self.node.pending_tx.add(tx['hash'])
         
         # Remove txs included in the block from this node's list
         self.node.transactions = [i for i in self.node.transactions if i not in b.transactions]

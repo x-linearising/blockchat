@@ -35,7 +35,7 @@ class Node:
         self.public_key = self.wallet.public_key
         self.my_info = None
         self.all_nodes: dict[int, NodeInfo] = {}
-        self.pending_tx = []
+        self.pending_tx = set()
         self.val_bcc = {}
         
         # Move this where the genesis block is received!!
