@@ -18,7 +18,9 @@ def user_interface(node, prompt_str=">>> "):
 
 app = Flask(__name__)
 api = Api(app)
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.WARNING)
+log = logging.getLogger('werkzeug')
+log.setLevel(logging.WARNING)
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-b", "--bootstrap", action = argparse.BooleanOptionalAction, default = False)
