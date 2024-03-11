@@ -105,8 +105,8 @@ class Block():
             return False
         if not val_pubkey == self.validator:
             logging.warning("Validator mismatch")
-            print("Expected validator:", val_pubkey)
-            print("Received validator:", self.validator)
+            # print("Expected validator:", val_pubkey)
+            # print("Received validator:", self.validator)
             return False
         if not prev_hash == self.prev_hash:
             logging.warning("Previous hash mismatch")

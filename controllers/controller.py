@@ -28,7 +28,6 @@ class NodeController:
         self.lock = Lock()
 
     def after_request(self, response):
-        self.lock.acquire()
         request_path = request.path
 
         @response.call_on_close
@@ -43,9 +42,12 @@ class NodeController:
                 if recv_tx == Constants.MAX_NODES - 1:
                     print("Received initial BCCs, BROADCASTING FILE TXs")
                     self.node.execute_file_transactions()
-                if self.node.is_validator and len(self.node.transactions) >= Constants.CAPACITY:
+                if self.node.is_next_validator() and len(self.node.transactions) >= Constants.CAPACITY:
                     self.node.mint_block()
-        self.lock.release()
+            elif request_path == '/blocks':
+                if self.node.is_next_validator() and len(self.node.transactions) >= Constants.CAPACITY:
+                    self.node.mint_block()
+
         return response
 
 
@@ -148,25 +150,17 @@ class NodeController:
         # No need for response body. Responding with status 200.
         return '', 200
 
-    def receive_block(self):
-        """
-        Called when this node receives a request at the "/blocks" endpoint.
-        After checking that the block is valid, adds it to the blockchain
-        and calculates the next expected validator.
-        """
-        self.lock.acquire()
-        b = BlockRequest.from_request_to_block(request.json)
-        if not b.validate(b.validator, b.prev_hash):
-            return " ", 400
+    def process_block(self, b):
+        b.validate(self.node.next_validator(), self.node.blockchain.blocks[-1].block_hash)
 
         val_id = self.node.get_node_id_by_public_key(b.validator)
         self.node.all_nodes[val_id].bcc += b.fees()
-        
+
         self.node.blockchain.add(b)
 
         # If the block contains a tx that this node hasn't received, add its
         # hash to the pending_tx list.
-        
+
         block_tx_hashes = [tx["hash"] for tx in b.transactions]
         node_tx_hashes = [tx["hash"] for tx in self.node.transactions]
         diff = [i for i in block_tx_hashes if i not in node_tx_hashes]
@@ -188,7 +182,7 @@ class NodeController:
         #     print(i)
 
         # print("[RECV BLOCK] PENDING TX LEN {}".format(len(self.node.pending_tx)))
-        
+
         # Remove txs included in the block from this node's list
         prev = len(self.node.transactions)
         self.node.transactions = [i for i in self.node.transactions if i not in b.transactions]
@@ -199,11 +193,11 @@ class NodeController:
         # for i in self.node.transactions:
         #     print(i["hash"])
 
-        # Update val_bcc according to the txs in the block 
+        # Update val_bcc according to the txs in the block
         for tx in b.transactions:
             sender_pubkey = tx["contents"]["sender_addr"]
             sender_id = self.node.get_node_id_by_public_key(sender_pubkey)
-            
+
             self.node.val_bcc[sender_id] -= tx_cost(tx['contents'], self.node.validated_stakes[sender_id])
             if tx["contents"]["type"] == TransactionType.STAKE.value:
                 self.node.validated_stakes[sender_id] = tx["contents"]["amount"]
@@ -211,13 +205,31 @@ class NodeController:
                 recv_pubkey = tx["contents"]["recv_addr"]
                 recv_id = self.node.get_node_id_by_public_key(recv_pubkey)
                 self.node.val_bcc[recv_id] += tx["contents"]["amount"]
-        
+
         self.node.val_bcc[val_id] += b.fees()
 
         next_validator = self.node.next_validator()
+        self.node.validators.append(self.node.get_node_id_by_public_key(next_validator))
         self.node.is_validator = next_validator == self.node.public_key
-        
-        print("[RECV BLOCK with idx {}] Giving {:.2f} to the validator. Next val: {}".format(b.idx, b.fees(), self.node.get_node_id_by_public_key(next_validator)))
+
+        print("[PROCESS BLOCK with idx {}] Giving {:.2f} to the validator. Next val: {}".format(b.idx, b.fees(),
+                                                                                             self.node.get_node_id_by_public_key(
+                                                                                                 next_validator)))
+
+    def receive_block(self):
+        """
+        Called when this node receives a request at the "/blocks" endpoint.
+        After checking that the block is valid, adds it to the blockchain
+        and calculates the next expected validator.
+        """
+        self.lock.acquire()
+
+        b = BlockRequest.from_request_to_block(request.json)
+        self.node.pending_blocks[b.idx] = b
+        expected_index = self.node.blockchain.blocks[-1].idx + 1
+        while self.node.pending_blocks.get(expected_index) is not None:
+            self.process_block(self.node.pending_blocks.pop(expected_index))
+            expected_index += 1
 
         self.lock.release()
         return "", 200

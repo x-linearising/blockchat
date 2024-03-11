@@ -37,6 +37,7 @@ class Node:
         self.all_nodes: dict[int, NodeInfo] = {}
         self.pending_tx = set()
         self.val_bcc = {}
+        self.pending_blocks = {}
         
         # Move this where the genesis block is received!!
         if node_id is None:
@@ -118,6 +119,9 @@ class Node:
                 # TODO: Handle this?
                 logging.error(f"Request to node {node_id} failed with status code: {response.status_code}.")
 
+    def is_next_validator(self):
+        return self.next_validator() == self.public_key
+
     def next_validator(self):
         nodes = [i for i in range(Constants.MAX_NODES)]
 
@@ -131,7 +135,7 @@ class Node:
         i = random.choices(nodes, weights=weights, k=1)[0]
         
         self.validators.append(i)
-        print("[Proof of Stake] Next validator id:", i)
+        # print("[Proof of Stake] Next validator id:", i)
         return self.all_nodes[i].public_key
 
 
@@ -194,6 +198,8 @@ class Node:
         b = Block(prev_block.idx+1, time.time(), block_txs, self.public_key, prev_block.block_hash)
         b.set_hash()
 
+        print(f"[MINT BLOCK with idx: {b.idx}]")
+
         # Updated the amount of validated BCCs for each node.
         for tx in block_txs:
             sender_id = self.get_node_id_by_public_key(tx["contents"]["sender_addr"])
@@ -217,7 +223,7 @@ class Node:
         self.broadcast_request(block_request, '/blocks')
 
         next_validator = self.next_validator()
-        self.is_validator = (next_validator == self.public_key) 
+        self.is_validator = (next_validator == self.public_key)
 
     def stake(self, amount):
         self.create_tx(str(Constants.BOOTSTRAP_ID), TransactionType.STAKE.value, amount)
