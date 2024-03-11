@@ -3,6 +3,7 @@ import time
 import random
 import requests
 from functools import reduce
+from random import randint
 
 import helper
 from helper import tx_str
@@ -162,7 +163,7 @@ class Node:
             case _:
                 print("Invalid transaction type.")
                 return
-        print(f"Total transaction cost: {transaction_cost}")
+        # print(f"Total transaction cost: {transaction_cost}")
 
         if transaction_cost > self.my_info.bcc:
             print(f"Transaction cannot proceed as the node does not have the required BCCs.")
@@ -177,11 +178,17 @@ class Node:
             self.stakes[self.id] = payload
 
         tx_request = self.tx_builder.create(recv, type, payload)
-        self.broadcast_request(tx_request, "/transactions")
+
+        # print("[CREATE TX] {}".format(tx_request["hash"]))
+
         self.transactions.append(tx_request)
+        # print("\nMY TX HASHES:")
+        # for tx in self.transactions:
+        #     print(tx["hash"])
+        # print("\n")
+        self.broadcast_request(tx_request, "/transactions")
 
         if self.is_validator and len(self.transactions) >= Constants.CAPACITY:
-            print("Validator sends a block.")
             self.mint_block()
 
     def mint_block(self):
@@ -192,15 +199,17 @@ class Node:
         """
         prev_block = self.blockchain.blocks[-1]
         block_txs = self.transactions[:Constants.CAPACITY]
+        # print("[MINT BLOCK] WITH TXS:")
+        # for tx in block_txs:
+        #     print(tx["hash"])
+
         # Prune txs added to the block from this node's list
         self.transactions = self.transactions[Constants.CAPACITY:]
 
         b = Block(prev_block.idx+1, time.time(), block_txs, self.public_key, prev_block.block_hash)
         b.set_hash()
 
-        print(f"[MINT BLOCK with idx: {b.idx}]")
-
-        # Updated the amount of validated BCCs for each node.
+        # Update the amount of validated BCCs for each node.
         for tx in block_txs:
             sender_id = self.get_node_id_by_public_key(tx["contents"]["sender_addr"])
             self.val_bcc[sender_id] -= tx_cost(tx["contents"], self.validated_stakes[sender_id])
@@ -223,7 +232,9 @@ class Node:
         self.broadcast_request(block_request, '/blocks')
 
         next_validator = self.next_validator()
-        self.is_validator = (next_validator == self.public_key)
+        self.is_validator = (next_validator == self.public_key) 
+        print("[MINT BLOCK with idx {}. Next val: {}]".format(prev_block.idx+1, self.get_node_id_by_public_key(next_validator)))
+
 
     def stake(self, amount):
         self.create_tx(str(Constants.BOOTSTRAP_ID), TransactionType.STAKE.value, amount)
@@ -232,10 +243,26 @@ class Node:
     def view_block(self):
         return self.blockchain.blocks[-1].to_str()
 
+    def read_simple_transaction_file(self):
+        receivers = []
+        messages = []
+        with open("input/transez.txt", "r") as f:
+            lines = f.readlines()
+            for line in lines:
+                recv_id = randint(0, Constants.MAX_NODES)
+                while recv_id == self.id:
+                    recv_id = randint(0, Constants.MAX_NODES)
+                receivers.append(recv_id)
+                messages.append(line)
+
+        return receivers, messages
+
+
     def execute_file_transactions(self):
-        receivers, messages = helper.read_transaction_file(self.id)
+        # receivers, messages = helper.read_transaction_file(self.id)
+        receivers, messages = self.read_simple_transaction_file()
         for receiver, message in zip(receivers, messages):
-            time.sleep(0.1 + random.random())
+            # time.sleep(0.1 + random.random())
 
             if receiver > Constants.MAX_NODES - 1:
                 continue
