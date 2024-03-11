@@ -1,4 +1,5 @@
 import logging
+from threading import Lock
 from flask import Blueprint, abort, request
 
 from node import Node, NodeInfo
@@ -11,6 +12,7 @@ from response_classes.join_response import JoinResponse
 from constants import Constants
 from transaction import TransactionType, verify_tx, tx_cost 
 
+recv_tx = 0
 
 class NodeController:
     
@@ -23,19 +25,27 @@ class NodeController:
         self.blueprint.add_url_rule("/transactions", "transaction", self.receive_transaction, methods=["POST"])
         self.blueprint.add_url_rule("/blocks", "blocks", self.receive_block, methods=["POST"])
         self.node = Node(ip_address, port)
+        self.lock = Lock()
 
     def after_request(self, response):
+        self.lock.acquire()
         request_path = request.path
 
         @response.call_on_close
         def process_after_request():
-            if request_path == '/nodes':
-                print("[Poll Thread] Bootstrap phase over. Executing file transactions...")
-                self.node.execute_file_transactions()
+            global recv_tx
+            if request_path == '/blockchain':
+                # print("[Poll Thread] Bootstrap phase over. Executing file transactions...")
+                # self.node.execute_file_transactions()
+                pass
             elif request_path == '/transactions':
+                recv_tx += 1
+                if recv_tx == Constants.MAX_NODES - 1:
+                    print("Received initial BCCs, BROADCASTING FILE TXs")
+                    self.node.execute_file_transactions()
                 if self.node.is_validator and len(self.node.transactions) >= Constants.CAPACITY:
-                    print("Validator sends a block.")
                     self.node.mint_block()
+        self.lock.release()
         return response
 
 
@@ -43,7 +53,7 @@ class NodeController:
         """
         Endpoint hit by a node broadcasting a transaction.
         """
-
+        self.lock.acquire()
         # Extracting information from request
         transaction_as_dict = request.json
         tx_contents = transaction_as_dict["contents"]
@@ -86,19 +96,22 @@ class NodeController:
                 print(f"My id: {self.node.id} Recv ID: {recv_id} My bcc: {self.node.my_info.bcc}")
                 logging.info("I received {} BCC".format(tx_contents["amount"]))
 
+
+        # print("[RECV TX] {}".format(transaction_as_dict["hash"]))
         if transaction_as_dict["hash"] not in self.node.pending_tx:
             self.node.transactions.append(transaction_as_dict)
         else:
+            # print("[PENDING TX] will not add {} -- WAS IN PENDING TX LIST".format(transaction_as_dict["hash"]))
             self.node.pending_tx.remove(transaction_as_dict["hash"])
 
-
+        self.lock.release()
         return '', 200
 
     def set_final_node_list(self):
         """
         Endpoint hit by the bootstrap node, who sends the final list of nodes to all participating nodes.
         """
-
+        self.lock.acquire()
         # Updating node list
         self.node.all_nodes = NodeListRequest.from_request_to_node_info_dict(request.json)
         self.node.val_bcc = {node_id: node_info.bcc for node_id, node_info in self.node.all_nodes.items()}
@@ -111,6 +124,7 @@ class NodeController:
         for k in self.node.all_nodes.keys():
             self.node.expected_nonce[k] = 0
 
+        self.lock.release()
         # No need for response body. Responding with status 200.
         return '', 200
 
@@ -118,9 +132,7 @@ class NodeController:
         """
         Endpoint hit by the bootstrap node, who sends the blockchain after bootstrap phase is complete.
         """
-
-        logging.info(f"Received initial state of blockchain:")
-
+        self.lock.acquire()
         # Mapping request body to class
         blocks = BlockchainRequest.from_request_to_blocks(request.json)
         # print(blocks[0].to_str())
@@ -128,10 +140,11 @@ class NodeController:
         # Updating node list
         self.node.blockchain.blocks = blocks
         
-        logging.info("Blockchain has been updated successfully.")
+        logging.info("[Bootstrap Phase] Blockchain has been updated successfully.")
 
         self.node.is_validator = (self.node.public_key == self.node.next_validator())
 
+        self.lock.release()
         # No need for response body. Responding with status 200.
         return '', 200
 
@@ -141,23 +154,50 @@ class NodeController:
         After checking that the block is valid, adds it to the blockchain
         and calculates the next expected validator.
         """
+        self.lock.acquire()
         b = BlockRequest.from_request_to_block(request.json)
         if not b.validate(b.validator, b.prev_hash):
             return " ", 400
 
         val_id = self.node.get_node_id_by_public_key(b.validator)
         self.node.all_nodes[val_id].bcc += b.fees()
-        logging.info("Giving {:.2f} to the validator".format(b.fees()))
         
         self.node.blockchain.add(b)
 
         # If the block contains a tx that this node hasn't received, add its
         # hash to the pending_tx list.
-        for tx in [i for i in b.transactions if i not in self.node.transactions]:
-            self.node.pending_tx.add(tx['hash'])
+        
+        block_tx_hashes = [tx["hash"] for tx in b.transactions]
+        node_tx_hashes = [tx["hash"] for tx in self.node.transactions]
+        diff = [i for i in block_tx_hashes if i not in node_tx_hashes]
+
+        for tx_hash in diff:
+            # if tx_hash in self.node.pending_tx:
+            #     continue
+            # print("PENDING TX ADDED {}".format(tx_hash))
+            self.node.pending_tx.add(tx_hash)
+
+        # print("Block TX")
+        # for i in b.transactions:
+        #     print(i["hash"])
+        # print("\nMy TX BEFORE")
+        # for i in self.node.transactions:
+        #     print(i["hash"])
+        # print("\nDIFF")
+        # for i in diff:
+        #     print(i)
+
+        # print("[RECV BLOCK] PENDING TX LEN {}".format(len(self.node.pending_tx)))
         
         # Remove txs included in the block from this node's list
+        prev = len(self.node.transactions)
         self.node.transactions = [i for i in self.node.transactions if i not in b.transactions]
+        after = len(self.node.transactions)
+
+        # print("[RECV BLOCK] TX LEN BEFORE: {} AFTER: {}".format(prev, after))
+        # print("\nMy TX AFTER")
+        # for i in self.node.transactions:
+        #     print(i["hash"])
 
         # Update val_bcc according to the txs in the block 
         for tx in b.transactions:
@@ -176,7 +216,10 @@ class NodeController:
 
         next_validator = self.node.next_validator()
         self.node.is_validator = next_validator == self.node.public_key
+        
+        print("[RECV BLOCK with idx {}] Giving {:.2f} to the validator. Next val: {}".format(b.idx, b.fees(), self.node.get_node_id_by_public_key(next_validator)))
 
+        self.lock.release()
         return "", 200
 
 class BootstrapController(NodeController):
@@ -191,9 +234,10 @@ class BootstrapController(NodeController):
         self.blueprint.add_url_rule("/nodes", "nodes", self.add_node, methods=["POST"])
         self.blueprint.add_url_rule("/transactions", "transactions", self.receive_transaction, methods=["POST"])
         self.blueprint.add_url_rule("/blocks", "blocks", self.receive_block, methods=["POST"])
-
+        self.lock = Lock()
 
     def after_request(self, response):
+        self.lock.acquire()
         request_path = request.path
 
         @response.call_on_close
@@ -208,6 +252,7 @@ class BootstrapController(NodeController):
                 self.node.perform_initial_transactions()
                 self.node.execute_file_transactions()
 
+        self.lock.release()
         return response
 
 
@@ -217,7 +262,7 @@ class BootstrapController(NodeController):
         Adds the node's info (public key, ip, port) to the bootstraps node list and
         returns the node's assigned id.
         """
-
+        self.lock.acquire()
         # Mapping request body to class
 
         join_request = JoinRequest.from_json(request.json)
@@ -239,6 +284,7 @@ class BootstrapController(NodeController):
         response = JoinResponse(self.nodes_counter)
         self.nodes_counter += 1
 
+        self.lock.release()
         return response.to_dict()
 
     def validate_join_request(self, join_request: JoinRequest):
