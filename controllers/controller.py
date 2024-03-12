@@ -42,14 +42,8 @@ class NodeController:
                 if recv_tx == Constants.MAX_NODES - 1:
                     print("Received initial BCCs, BROADCASTING FILE TXs")
                     self.node.execute_file_transactions()
-                if self.node.is_next_validator() and len(self.node.transactions) >= Constants.CAPACITY:
-                    self.node.mint_block()
-            elif request_path == '/blocks':
-                if self.node.is_next_validator() and len(self.node.transactions) >= Constants.CAPACITY:
-                    self.node.mint_block()
 
         return response
-
 
     def receive_transaction(self):
         """
@@ -67,8 +61,6 @@ class NodeController:
         recv_public_key = tx_contents["recv_addr"]
         recv_info = self.node.get_node_info_by_public_key(recv_public_key)
         recv_id = self.node.get_node_id_by_public_key(recv_public_key)
-
-        # logging.info(f"Received transaction from Node {sender_id}.")
 
         # Transaction Cost
         transaction_cost = tx_cost(tx_contents, self.node.stakes[sender_id])
@@ -135,19 +127,10 @@ class NodeController:
         Endpoint hit by the bootstrap node, who sends the blockchain after bootstrap phase is complete.
         """
         self.lock.acquire()
-        # Mapping request body to class
-        blocks = BlockchainRequest.from_request_to_blocks(request.json)
-        # print(blocks[0].to_str())
-
-        # Updating node list
-        self.node.blockchain.blocks = blocks
-        
-        logging.info("[Bootstrap Phase] Blockchain has been updated successfully.")
-
-        self.node.is_validator = (self.node.public_key == self.node.next_validator())
-
+        self.node.blockchain.blocks = BlockchainRequest.from_request_to_blocks(request.json)
+        print("[Bootstrap Phase] Blockchain has been updated successfully.")
         self.lock.release()
-        # No need for response body. Responding with status 200.
+
         return '', 200
 
     def process_block(self, b):
@@ -208,13 +191,7 @@ class NodeController:
 
         self.node.val_bcc[val_id] += b.fees()
 
-        next_validator = self.node.next_validator()
-        self.node.validators.append(self.node.get_node_id_by_public_key(next_validator))
-        self.node.is_validator = next_validator == self.node.public_key
-
-        print("[PROCESS BLOCK with idx {}] Giving {:.2f} to the validator. Next val: {}".format(b.idx, b.fees(),
-                                                                                             self.node.get_node_id_by_public_key(
-                                                                                                 next_validator)))
+        print("[PROCESS BLOCK with idx {}]".format(b.idx))
 
     def receive_block(self):
         """
@@ -255,12 +232,10 @@ class BootstrapController(NodeController):
         @response.call_on_close
         def process_after_request():
             if request_path == '/nodes' and self.nodes_counter == Constants.MAX_NODES:
-                print("[Poll Thread] Bootstrap phase over. Broadcasting...")
                 self.node.broadcast_node_list()
                 self.node.broadcast_blockchain()
                 self.node.initialize_stakes()
                 next_validator = self.node.next_validator()
-                self.node.is_validator = next_validator == self.node.public_key
                 self.node.perform_initial_transactions()
                 self.node.execute_file_transactions()
 
