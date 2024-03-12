@@ -2,7 +2,7 @@ import logging
 import time
 import random
 import requests
-
+import sys
 import os
 from functools import reduce
 from random import randint
@@ -58,6 +58,8 @@ class Node:
         self.stakes = {}
         self.validated_stakes = {}
         self.expected_nonce = {}
+        self.validated_nonce = {}
+
         self.blockchain = Blockchain()
         # Keep a list of which node (by id) validated each block for testing
         self.validators = []
@@ -66,9 +68,11 @@ class Node:
         thr.start()
         thr2 = Thread(target=self.poll_done)
         thr2.start()
-
+ 
     def poll_capacity(self):
+        # time.sleep(3)
         while True:
+            # print(f"is_next_validator {self.is_next_validator()}!!")
             if (len(self.transactions) >= Constants.CAPACITY) and self.is_next_validator():
                 self.mint_block()
             else:
@@ -90,6 +94,7 @@ class Node:
             self.stakes[node_id] = Constants.INITIAL_STAKE
             self.validated_stakes[node_id] = Constants.INITIAL_STAKE
             self.all_nodes[node_id].bcc -= Constants.INITIAL_STAKE
+            # self.val_bcc[node_id] -= Constants.INITIAL_STAKE
         return self.stakes
 
     def get_node_info_by_public_key(self, public_key):
@@ -133,29 +138,35 @@ class Node:
             if node_id == self.id:
                 continue
 
+            # if endpoint == "/blocks":
+                # print(f"Sending block to {node_id}")
+
             response = requests.post(node.get_node_url() + endpoint,
                                      json=request_body,
                                      headers=Constants.JSON_HEADER)
+
             if response.ok:
                 # logging.info(f"Request to node {node_id} was successful with status code: {response.status_code}.")
                 pass
             else:
                 # TODO: Handle this?
                 logging.error(f"Request to node {node_id} failed with status code: {response.status_code}.")
+                sys.exit()
 
-    def is_next_validator(self):
+    def is_next_validator(self, idx=-1):
         return self.next_validator() == self.public_key
 
-    def next_validator(self):
-        nodes = [i for i in range(Constants.MAX_NODES)]
+    def next_validator(self, idx=-1):
+        prev_block = self.blockchain.blocks[idx]
 
+        nodes = [i for i in range(Constants.MAX_NODES)]
         stakes = [self.validated_stakes[i] for i in nodes]
 
         total_stake = sum(stakes)
 
         weights = [stakes[i]/total_stake for i in nodes]
 
-        random.seed(self.blockchain.blocks[-1].block_hash)
+        random.seed(prev_block.block_hash)
         i = random.choices(nodes, weights=weights, k=1)[0]
         
         self.validators.append(i)
@@ -187,8 +198,12 @@ class Node:
                 return
         # print(f"Total transaction cost: {transaction_cost}")
 
+        if self.id == 0:
+            print(f"Cost: {transaction_cost} My balance: {self.my_info.bcc}")
+        
         if transaction_cost > self.my_info.bcc:
             print(f"Transaction cannot proceed as the node does not have the required BCCs.")
+            time.sleep(5)
             return
 
         # Balance updates
@@ -216,6 +231,8 @@ class Node:
         Remove the oldest `capacity` received transactions, create a block from
         them and send it to the rest of the nodes.
         """
+
+
         prev_block = self.blockchain.blocks[-1]
         block_txs = self.transactions[:Constants.CAPACITY]
         # print("[MINT BLOCK] WITH TXS:")
@@ -228,11 +245,12 @@ class Node:
         b = Block(prev_block.idx+1, time.time(), block_txs, self.public_key, prev_block.block_hash)
         b.set_hash()
 
+        print("[MINT BLOCK with idx {} VAL = {}]".format(prev_block.idx+1, self.id))
+
         # Update the amount of validated BCCs for each node.
         for tx in block_txs:
             sender_id = self.get_node_id_by_public_key(tx["contents"]["sender_addr"])
             self.val_bcc[sender_id] -= tx_cost(tx["contents"], self.validated_stakes[sender_id])
-
 
             if tx["contents"]["type"] == TransactionType.STAKE.value:
                 self.validated_stakes[sender_id] = tx["contents"]["amount"]
@@ -250,7 +268,6 @@ class Node:
         self.blockchain.add(b)
         self.broadcast_request(block_request, '/blocks')
 
-        print("[MINT BLOCK with idx {}]".format(prev_block.idx+1))
 
 
     def stake(self, amount):
@@ -381,7 +398,7 @@ class Node:
                 else:
                     s = self.view_block()
                 print(s)
-                print("validators: {}".format(self.validators))
+                # print("validators: {}".format(self.validators))
             case "tx":
                 len_sum = 0
                 tabs = 1 * "\t"
@@ -397,6 +414,7 @@ class Node:
                 s += tabs + "]"
                 print(s)
                 print(f"Sum of lengths of messages = {len_sum}")
+                print(f"TX List length = {len(self.transactions)}")
             case "balance":
                 print("\n" + self.balance())
             case "logs":

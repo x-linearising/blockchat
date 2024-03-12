@@ -25,6 +25,14 @@ class Bootstrap(Node):
         self.val_bcc = {i : 0 for i in range(self.id + 1, Constants.MAX_NODES)}
         self.val_bcc[self.id] = Constants.STARTING_BCC_PER_NODE * Constants.MAX_NODES
 
+        for k in self.all_nodes.keys():
+            if k == Constants.BOOTSTRAP_ID:
+                self.expected_nonce[k] = 1
+                self.validated_nonce[k] = 1
+
+            self.expected_nonce[k] = 0
+            self.validated_nonce[k] = 0
+
     def genesis(self):
         genesis_tx = self.tx_builder.create(
             Constants.BOOTSTRAP_PUBKEY,
@@ -37,6 +45,7 @@ class Bootstrap(Node):
         
         self.blockchain.add(genesis_block)
         self.my_info.bcc = Constants.STARTING_BCC_PER_NODE * Constants.MAX_NODES
+        print("Bootstrap bcc: {}".format(self.my_info.bcc))
 
 
     def node_has_joined(self, ip_address, port):
@@ -52,6 +61,7 @@ class Bootstrap(Node):
 
         for k in self.all_nodes.keys():
             self.expected_nonce[k] = 0
+            self.validated_nonce[k] = 0
 
         logging.info("Bootstrap phase complete. All nodes have received the participant list.")
 
@@ -72,6 +82,7 @@ class Bootstrap(Node):
             
             # print("Sending initial bcc to {}".format(node_id))
             transfer_amount = Constants.STARTING_BCC_PER_NODE
+            print(f"Transfer amount : {transfer_amount}")
             tx = self.tx_builder.create(recv_addr=node.public_key,
                                         trans_type=TransactionType.AMOUNT.value,
                                         payload=transfer_amount)
@@ -79,5 +90,7 @@ class Bootstrap(Node):
             self.broadcast_request(tx, "/transactions")
             node.bcc += transfer_amount
             self.my_info.bcc -= transfer_amount * Constants.TRANSFER_FEE_MULTIPLIER
+            print("Bootstrap bcc: {}".format(self.my_info.bcc))
+
 
 

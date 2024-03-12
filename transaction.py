@@ -72,7 +72,7 @@ def verify_tx(tx, expected_nonce) -> bool:
         return False
 
     if tx["contents"]["nonce"] < expected_nonce:
-        print("[Received Transaction] Invalid nonce detected! (possible replay attack)")
+        print("[Received Transaction] Invalid nonce detected: EXP = {} GOT = {} SENDER = {}! (possible replay attack)".format(expected_nonce, tx["contents"]["nonce"], tx["contents"]["sender_addr"][100:110]))
         return False
 
 

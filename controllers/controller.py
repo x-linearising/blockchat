@@ -34,8 +34,6 @@ class NodeController:
         def process_after_request():
             global recv_tx
             if request_path == '/blockchain':
-                # print("[Poll Thread] Bootstrap phase over. Executing file transactions...")
-                # self.node.execute_file_transactions()
                 pass
             elif request_path == '/transactions':
                 recv_tx += 1
@@ -45,15 +43,10 @@ class NodeController:
 
         return response
 
-    def receive_transaction(self):
-        """
-        Endpoint hit by a node broadcasting a transaction.
-        """
-        self.lock.acquire()
-        # Extracting information from request
-        transaction_as_dict = request.json
-        tx_contents = transaction_as_dict["contents"]
-        
+
+    def process_soft_tx(self, tx, soft=True):
+        tx_contents = tx["contents"]
+
         sender_public_key = tx_contents["sender_addr"]
         sender_info = self.node.get_node_info_by_public_key(sender_public_key)
         sender_id = self.node.get_node_id_by_public_key(sender_public_key)
@@ -61,42 +54,90 @@ class NodeController:
         recv_public_key = tx_contents["recv_addr"]
         recv_info = self.node.get_node_info_by_public_key(recv_public_key)
         recv_id = self.node.get_node_id_by_public_key(recv_public_key)
-
-        # Transaction Cost
+        
         transaction_cost = tx_cost(tx_contents, self.node.stakes[sender_id])
         if transaction_cost is None:
-            logging.warning("Invalid transaction type was detected.")
+            err = "Invalid transaction type was detected."
+            logging.warning(err)
+            return False, err
 
         # Transaction validations
-        if not verify_tx(transaction_as_dict, self.node.expected_nonce[sender_id]):
-            return "Invalid signature.", 400
+        if not verify_tx(tx, self.node.expected_nonce[sender_id]):
+            return False, "Invalid signature."
         if transaction_cost > sender_info.bcc:   # Stakes are not contained in bcc attribute.
             logging.warning("Transaction is not valid as node's amount is not sufficient.")
-            return "Not enough bcc to carry out transaction.", 400
+            return False, "Not enough bcc to carry out transaction."
 
         # We assume that we cannot receive out-of-order transactions from the same sender,
         # since senders wait for ACKs before continuing.
         # Therefore the scenario of receiving the message w/ nonce n after n+1 is
         # impossible 
         self.node.expected_nonce[sender_id] += 1
+
         # BCCs and transaction list updates
         sender_info.bcc -= transaction_cost
+
         if tx_contents["type"] == TransactionType.STAKE.value:
             self.node.stakes[sender_id] = tx_contents["amount"]
-        if tx_contents["type"] == TransactionType.AMOUNT.value:
+        elif tx_contents["type"] == TransactionType.AMOUNT.value:
             recv_info.bcc += tx_contents["amount"]
 
-            if recv_public_key == self.node.public_key:
-                print(f"My id: {self.node.id} Recv ID: {recv_id} My bcc: {self.node.my_info.bcc}")
-                logging.info("I received {} BCC".format(tx_contents["amount"]))
+        return True, ""
 
 
-        # print("[RECV TX] {}".format(transaction_as_dict["hash"]))
-        if transaction_as_dict["hash"] not in self.node.pending_tx:
-            self.node.transactions.append(transaction_as_dict)
+    def process_hard_tx(self, tx):
+        tx_contents = tx["contents"]
+
+        sender_public_key = tx_contents["sender_addr"]
+        sender_id = self.node.get_node_id_by_public_key(sender_public_key)
+        
+        recv_public_key = tx_contents["recv_addr"]
+        recv_id = self.node.get_node_id_by_public_key(recv_public_key)
+        
+        transaction_cost = tx_cost(tx_contents, self.node.validated_stakes[sender_id])
+        if transaction_cost is None:
+            err = "Invalid transaction type was detected."
+            logging.warning(err)
+            return False, err
+
+        # Transaction validations
+        if not verify_tx(tx, self.node.validated_nonce[sender_id]):
+            return False, "Invalid signature."
+        if transaction_cost > self.node.val_bcc[sender_id]:   # Stakes are not contained in bcc attribute.
+            logging.warning("Transaction is not valid as node's amount is not sufficient.")
+            return False, "Not enough bcc to carry out transaction."
+
+        # We assume that we cannot receive out-of-order transactions from the same sender,
+        # since senders wait for ACKs before continuing.
+        # Therefore the scenario of receiving the message w/ nonce n after n+1 is
+        # impossible 
+        self.node.validated_nonce[sender_id] += 1
+
+        # BCCs and transaction list updates
+        self.node.val_bcc[sender_id] -= transaction_cost
+
+        if tx_contents["type"] == TransactionType.STAKE.value:
+            self.node.validated_stakes[sender_id] = tx_contents["amount"]
+        elif tx_contents["type"] == TransactionType.AMOUNT.value:
+            self.node.val_bcc[recv_id] += tx_contents["amount"]
+
+        return True, ""
+
+    def receive_transaction(self):
+        """
+        Endpoint hit by a node broadcasting a transaction.
+        """
+        self.lock.acquire()
+        tx = request.json
+        valid, err = self.process_soft_tx(tx)
+        if not valid:
+            return err, 400
+
+        if tx["hash"] not in self.node.pending_tx:
+            self.node.transactions.append(tx)
         else:
-            # print("[PENDING TX] will not add {} -- WAS IN PENDING TX LIST".format(transaction_as_dict["hash"]))
-            self.node.pending_tx.remove(transaction_as_dict["hash"])
+            # print("[PENDING TX] will not add {} -- WAS IN PENDING TX LIST".format(tx["hash"]))
+            self.node.pending_tx.remove(tx["hash"])
 
         self.lock.release()
         return '', 200
@@ -117,6 +158,7 @@ class NodeController:
 
         for k in self.node.all_nodes.keys():
             self.node.expected_nonce[k] = 0
+            self.node.validated_nonce[k] = 0
 
         self.lock.release()
         # No need for response body. Responding with status 200.
@@ -134,24 +176,40 @@ class NodeController:
         return '', 200
 
     def process_block(self, b):
-        b.validate(self.node.next_validator(), self.node.blockchain.blocks[-1].block_hash)
+
+        idx = b.idx - 1
+
+        print("[PROCESS BLOCK with idx {} VAL = {} EXP_VAL = {}]".format(
+            b.idx,
+            b.validator[100:110],
+            self.node.next_validator(idx)[100:110]
+            ))
+        
+        if not b.validate(self.node.next_validator(idx), self.node.blockchain.blocks[idx].block_hash):
+            return
+        
+        # Check that the block contains valid TXs
+        for tx in b.transactions:
+            valid, err = self.process_hard_tx(tx)
+            if not valid:
+                logging.warn(err)
+                return
+
 
         val_id = self.node.get_node_id_by_public_key(b.validator)
-        self.node.all_nodes[val_id].bcc += b.fees()
-
+        self.node.val_bcc[val_id] += b.fees()
         self.node.blockchain.add(b)
 
+        if self.node.id == 0:
+            print("Val bcc after process_block: {}".format(self.node.val_bcc[0]))
+        
         # If the block contains a tx that this node hasn't received, add its
         # hash to the pending_tx list.
-
         block_tx_hashes = [tx["hash"] for tx in b.transactions]
         node_tx_hashes = [tx["hash"] for tx in self.node.transactions]
         diff = [i for i in block_tx_hashes if i not in node_tx_hashes]
 
         for tx_hash in diff:
-            # if tx_hash in self.node.pending_tx:
-            #     continue
-            # print("PENDING TX ADDED {}".format(tx_hash))
             self.node.pending_tx.add(tx_hash)
 
         # print("Block TX")
@@ -176,22 +234,19 @@ class NodeController:
         # for i in self.node.transactions:
         #     print(i["hash"])
 
-        # Update val_bcc according to the txs in the block
-        for tx in b.transactions:
-            sender_pubkey = tx["contents"]["sender_addr"]
-            sender_id = self.node.get_node_id_by_public_key(sender_pubkey)
 
-            self.node.val_bcc[sender_id] -= tx_cost(tx['contents'], self.node.validated_stakes[sender_id])
-            if tx["contents"]["type"] == TransactionType.STAKE.value:
-                self.node.validated_stakes[sender_id] = tx["contents"]["amount"]
-            if tx["contents"]["type"] == TransactionType.AMOUNT.value:
-                recv_pubkey = tx["contents"]["recv_addr"]
-                recv_id = self.node.get_node_id_by_public_key(recv_pubkey)
-                self.node.val_bcc[recv_id] += tx["contents"]["amount"]
+        # Reset soft state to current hard state
+        for k in self.node.val_bcc.keys():
+            self.node.all_nodes[k].bcc = self.node.val_bcc[k]            
+            self.node.expected_nonce[k] = self.node.validated_nonce[k]
+            self.node.stakes[k] = self.node.validated_stakes[k]
 
-        self.node.val_bcc[val_id] += b.fees()
+        # Re-apply received transactions to soft state
+        for tx in self.node.transactions:
+            valid, err = self.process_soft_tx(tx)
+            if not valid:
+                logging.warn(err)
 
-        print("[PROCESS BLOCK with idx {}]".format(b.idx))
 
     def receive_block(self):
         """
@@ -207,6 +262,11 @@ class NodeController:
         while self.node.pending_blocks.get(expected_index) is not None:
             self.process_block(self.node.pending_blocks.pop(expected_index))
             expected_index += 1
+
+        l = len(self.node.pending_blocks)
+
+        if l > 0:
+            print(f"[RECV BLOCK] have {l} pending blocks")
 
         self.lock.release()
         return "", 200
@@ -235,7 +295,6 @@ class BootstrapController(NodeController):
                 self.node.broadcast_node_list()
                 self.node.broadcast_blockchain()
                 self.node.initialize_stakes()
-                next_validator = self.node.next_validator()
                 self.node.perform_initial_transactions()
                 self.node.execute_file_transactions()
 

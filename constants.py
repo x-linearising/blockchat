@@ -10,9 +10,9 @@ class Constants:
     BOOTSTRAP_PRIVKEY_PATH = path.join(".", "bootstrap_keys", "id_rsa")
     BOOTSTRAP_URL = f"http://{BOOTSTRAP_IP_ADDRESS}:{BOOTSTRAP_PORT}"
 
-    MAX_NODES = 3
+    MAX_NODES = 10
     JSON_HEADER = {'Content-Type': 'application/json'}
-    CAPACITY = 5
+    CAPACITY = 2
     STARTING_BCC_PER_NODE = 1000
     TRANSFER_FEE_MULTIPLIER = 1.03
     INITIAL_STAKE = 50
