@@ -304,6 +304,11 @@ class Node:
         with open(fpath, "w") as f:
             f.write(self.blockchain.to_str(indent=0) + "\n")
 
+        fname = "balance" + str(self.id) + ".txt"
+        fpath = os.path.join("logs", fname)
+        with open(fpath, "w") as f:
+            f.write(self.balance(add_mark=False))  
+
     def waiting_tx_fees(self):
         fees = 0
         for tx in self.transactions:
@@ -314,35 +319,42 @@ class Node:
                     fees += len(tx["contents"]["message"])
         return fees
 
-    def balance(self):
-        print("")
-        print("Node   Balance   Stake   Total   Val. Balance   Val. Stake")
-        print("==========================================================")
-        # line example:
-        #     "10 (*) 10999.99 53.26"
+    def balance(self, add_mark=True):
+        """
+        Returns a string consisting of a table with the BCC balance and stake
+        of each node, at both their "hard" (verified in the blockchain)
+        and "soft" versions" (not yet verified).
+
+        If add_mark is True, the line corresponding to this node is marked
+        with a star.
+        """
+        s  = "Node   Balance   Stake   Total   Val. Balance   Val. Stake\n"
+        s += "==========================================================\n"
         total = []
         for i in range(Constants.MAX_NODES):
-            c = "(*)" if i == self.id else "   "
+            c = "(*)" if add_mark and i == self.id else "   "
             total.append(self.all_nodes[i].bcc + self.stakes[i])
-            print("{:<3d}{} {:<7.2f}   {:<7.2f} {:<7.2f} {:<14.2f} {:<9.2f}".format(
+            s += "{:<3d}{} {:<7.2f}   {:<7.2f} {:<7.2f} {:<14.2f} {:<9.2f}\n".format(
                 i,
                 c,
                 self.all_nodes[i].bcc,
                 self.stakes[i],
                 total[i],
                 self.val_bcc[i],
-                self.validated_stakes[i]),
+                self.validated_stakes[i]
             )
-        print("------------------------------------------------------------>(+)")
-        print("Total  {:<7.2f}   {:<7.2f} {:<7.2f} {:<14.2f} {:<9.2f}".format(
+        s += "------------------------------------------------------------>(+)\n"
+        s += "Total  {:<7.2f}   {:<7.2f} {:<7.2f} {:<14.2f} {:<9.2f}\n".format(
             reduce(lambda x,y: x+y, map(lambda d: d.bcc, self.all_nodes.values())),
             reduce(lambda x,y: x+y, self.stakes.values()),
             sum(total),
             reduce(lambda x,y: x+y, self.val_bcc.values()),
             reduce(lambda x,y: x+y, self.validated_stakes.values())
-        ))
-        print("Next val. will earn      {:<7.2f}".format(self.waiting_tx_fees()))
-        print("Total circulating BCCs:  {:<7.2f}".format(sum(total) + self.waiting_tx_fees()))
+        )
+        s += "Next val. will earn:     {:<7.2f}\n".format(self.waiting_tx_fees())
+        s += "Total circulating BCCs:  {:<7.2f}\n".format(sum(total) + self.waiting_tx_fees())
+
+        return s
 
     def execute_cmd(self, line: str):
         # lstrip to remove leading whitespace, if any
@@ -386,7 +398,7 @@ class Node:
                 print(s)
                 print(f"Sum of lengths of messages = {len_sum}")
             case "balance":
-                self.balance()
+                print("\n" + self.balance())
             case "logs":
                 self.dump_logs()
                 print("Dumped logs.")
