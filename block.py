@@ -100,18 +100,12 @@ class Block():
 
         if not my_hash == self.block_hash:
             logging.warning("Block hash mismatch")
-            print("Calculated hash:", my_hash)
-            print("Received hash:", self.block_hash)
             return False
         if not val_pubkey == self.validator:
             logging.warning("Validator mismatch")
-            # print("Expected validator:", val_pubkey)
-            # print("Received validator:", self.validator)
             return False
         if not prev_hash == self.prev_hash:
             logging.warning("Previous hash mismatch")
-            print("Previous hash:", prev_hash)
-            print("Received previous hash:", self.prev_hash)
             return False
         return True
 
