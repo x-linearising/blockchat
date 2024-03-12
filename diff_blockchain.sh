@@ -5,7 +5,7 @@ if [[ $1 == "" ]]; then
     exit
 fi
 
-fpath="./"
+fpath="./logs/"
 fname="blockchain"
 fextension=".txt"
 

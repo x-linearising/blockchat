@@ -2,6 +2,8 @@ import logging
 import time
 import random
 import requests
+
+import os
 from functools import reduce
 from random import randint
 from threading import Thread, Lock
@@ -287,12 +289,19 @@ class Node:
 
 
     def dump_logs(self):
-        fname = "validators" + str(self.id) + ".txt"
-        with open(fname, "w") as f:
-            for v in self.validators:
-                f.write(str(v) + "\n")
+        # Create log directory if it doesn't exist
+        if not os.path.exists("logs"):
+            os.mkdir("logs")
+
+        # fname = "validators" + str(self.id) + ".txt"
+        # fpath = path.join(".", "logs", fname)
+        # with open(fpath, "w") as f:
+        #     for v in self.validators:
+        #         f.write(str(v) + "\n")
+        
         fname = "blockchain" + str(self.id) + ".txt"
-        with open(fname, "w") as f:
+        fpath = os.path.join("logs", fname)
+        with open(fpath, "w") as f:
             f.write(self.blockchain.to_str(indent=0) + "\n")
 
     def waiting_tx_fees(self):
