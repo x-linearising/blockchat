@@ -102,7 +102,6 @@ class Block():
             return False
         if not val_pubkey == self.validator:
             logging.warning("Validator mismatch! GOT {} EXP {}".format(self.validator[100:110], val_pubkey[100:110]))
-            time.sleep(100)
             return False
         if not prev_hash == self.prev_hash:
             logging.warning("Previous hash mismatch")

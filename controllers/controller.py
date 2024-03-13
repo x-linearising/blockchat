@@ -65,8 +65,8 @@ class NodeController:
         if not verify_tx(tx, self.node.expected_nonce[sender_id]):
             return False, "Invalid signature."
         if transaction_cost > sender_info.bcc:   # Stakes are not contained in bcc attribute.
-            logging.warning("Transaction is not valid as node's amount is not sufficient.")
-            return False, "Not enough bcc to carry out transaction."
+            logging.warning("[SOFT] Transaction is not valid as node's amount is not sufficient.")
+            return False, "[SOFT] Not enough bcc to carry out transaction."
 
         # We assume that we cannot receive out-of-order transactions from the same sender,
         # since senders wait for ACKs before continuing.
@@ -104,8 +104,8 @@ class NodeController:
         if not verify_tx(tx, self.node.validated_nonce[sender_id]):
             return False, "Invalid signature."
         if transaction_cost > self.node.val_bcc[sender_id]:   # Stakes are not contained in bcc attribute.
-            logging.warning("Transaction is not valid as node's amount is not sufficient.")
-            return False, "Not enough bcc to carry out transaction."
+            logging.warning("[HARD] Transaction is not valid as node's amount is not sufficient.")
+            return False, "[HARD] Not enough bcc to carry out transaction."
 
         # We assume that we cannot receive out-of-order transactions from the same sender,
         # since senders wait for ACKs before continuing.
@@ -131,6 +131,7 @@ class NodeController:
         tx = request.json
         valid, err = self.process_soft_tx(tx)
         if not valid:
+            self.lock.release()
             return err, 400
 
         if tx["hash"] not in self.node.pending_tx:
@@ -157,8 +158,12 @@ class NodeController:
         self.node.initialize_stakes()
 
         for k in self.node.all_nodes.keys():
-            self.node.expected_nonce[k] = 0
-            self.node.validated_nonce[k] = 0
+            if k == Constants.BOOTSTRAP_ID:
+                self.node.expected_nonce[k] = 1
+                self.node.validated_nonce[k] = 1
+            else:
+                self.node.expected_nonce[k] = 0
+                self.node.validated_nonce[k] = 0
 
         self.lock.release()
         # No need for response body. Responding with status 200.
@@ -198,7 +203,6 @@ class NodeController:
 
         val_id = self.node.get_node_id_by_public_key(b.validator)
         self.node.val_bcc[val_id] += b.fees()
-        self.node.blockchain.add(b)
 
         if self.node.id == 0:
             print("Val bcc after process_block: {}".format(self.node.val_bcc[0]))
@@ -246,6 +250,10 @@ class NodeController:
             valid, err = self.process_soft_tx(tx)
             if not valid:
                 logging.warn(err)
+
+        self.node.blockchain.add(b)
+
+        print(f"[COMPLETE PROCESS OF BLOCK with idx {b.idx}.]")
 
 
     def receive_block(self):
@@ -324,6 +332,9 @@ class BootstrapController(NodeController):
             join_request.port,
             join_request.public_key
         )
+        self.node.val_bcc[self.nodes_counter] = 0
+        self.node.expected_nonce[self.nodes_counter] = 0
+        self.node.validated_nonce[self.nodes_counter] = 0
         logging.info(f"Node with id {self.nodes_counter} has been added to the network.")
 
         # Creating response

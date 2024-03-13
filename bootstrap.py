@@ -22,16 +22,6 @@ class Bootstrap(Node):
         )
         self.all_nodes[self.id] = self.my_info
         self.genesis()
-        self.val_bcc = {i : 0 for i in range(self.id + 1, Constants.MAX_NODES)}
-        self.val_bcc[self.id] = Constants.STARTING_BCC_PER_NODE * Constants.MAX_NODES
-
-        for k in self.all_nodes.keys():
-            if k == Constants.BOOTSTRAP_ID:
-                self.expected_nonce[k] = 1
-                self.validated_nonce[k] = 1
-
-            self.expected_nonce[k] = 0
-            self.validated_nonce[k] = 0
 
     def genesis(self):
         genesis_tx = self.tx_builder.create(
@@ -45,6 +35,10 @@ class Bootstrap(Node):
         
         self.blockchain.add(genesis_block)
         self.my_info.bcc = Constants.STARTING_BCC_PER_NODE * Constants.MAX_NODES
+        self.val_bcc[self.id] = Constants.STARTING_BCC_PER_NODE * Constants.MAX_NODES
+        self.expected_nonce[self.id] = 1
+        self.validated_nonce[self.id] = 1
+
         print("Bootstrap bcc: {}".format(self.my_info.bcc))
 
 
@@ -58,10 +52,6 @@ class Bootstrap(Node):
         # Send list to each node
         node_list_request = NodeListRequest.from_node_info_dict_to_request(self.all_nodes)
         self.broadcast_request(node_list_request, "/nodes")
-
-        for k in self.all_nodes.keys():
-            self.expected_nonce[k] = 0
-            self.validated_nonce[k] = 0
 
         logging.info("Bootstrap phase complete. All nodes have received the participant list.")
 
@@ -87,10 +77,11 @@ class Bootstrap(Node):
                                         trans_type=TransactionType.AMOUNT.value,
                                         payload=transfer_amount)
             self.transactions.append(tx)
-            self.broadcast_request(tx, "/transactions")
             node.bcc += transfer_amount
             self.my_info.bcc -= transfer_amount * Constants.TRANSFER_FEE_MULTIPLIER
+            self.expected_nonce[self.id] += 1
             print("Bootstrap bcc: {}".format(self.my_info.bcc))
+            self.broadcast_request(tx, "/transactions")
 
 
 

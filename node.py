@@ -70,11 +70,17 @@ class Node:
         thr2.start()
  
     def poll_capacity(self):
-        # time.sleep(3)
+        # Do not start minting until all nodes have received their BCCs.
+        while self.expected_nonce.get(Constants.BOOTSTRAP_ID) is None or self.expected_nonce.get(Constants.BOOTSTRAP_ID) < Constants.MAX_NODES:
+            time.sleep(1)
+        time.sleep(1)
+        blocks_competed_for = 1
         while True:
             # print(f"is_next_validator {self.is_next_validator()}!!")
-            if (len(self.transactions) >= Constants.CAPACITY) and self.is_next_validator():
-                self.mint_block()
+            if blocks_competed_for <= len(self.blockchain.blocks) and len(self.transactions) >= Constants.CAPACITY:
+                if self.is_next_validator(blocks_competed_for - 1):
+                    self.mint_block()
+                blocks_competed_for += 1
             else:
                 # yield
                 time.sleep(0)
@@ -94,7 +100,7 @@ class Node:
             self.stakes[node_id] = Constants.INITIAL_STAKE
             self.validated_stakes[node_id] = Constants.INITIAL_STAKE
             self.all_nodes[node_id].bcc -= Constants.INITIAL_STAKE
-            # self.val_bcc[node_id] -= Constants.INITIAL_STAKE
+            self.val_bcc[node_id] -= Constants.INITIAL_STAKE
         return self.stakes
 
     def get_node_info_by_public_key(self, public_key):
@@ -151,10 +157,10 @@ class Node:
             else:
                 # TODO: Handle this?
                 logging.error(f"Request to node {node_id} failed with status code: {response.status_code}.")
-                sys.exit()
+                sys.exit()  # TODO: This is causing trouble. Transaction file reading stops here.
 
     def is_next_validator(self, idx=-1):
-        return self.next_validator() == self.public_key
+        return self.next_validator(idx) == self.public_key
 
     def next_validator(self, idx=-1):
         prev_block = self.blockchain.blocks[idx]
@@ -331,7 +337,7 @@ class Node:
         for tx in self.transactions:
             match tx["contents"]["type"]:
                 case TransactionType.AMOUNT.value:
-                    fees += tx["contents"]["amount"] * (1 - Constants.TRANSFER_FEE_MULTIPLIER)
+                    fees += tx["contents"]["amount"] * (Constants.TRANSFER_FEE_MULTIPLIER - 1)
                 case TransactionType.MESSAGE.value:
                     fees += len(tx["contents"]["message"])
         return fees
