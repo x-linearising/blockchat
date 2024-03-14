@@ -156,8 +156,8 @@ class Node:
                 pass
             else:
                 # TODO: Handle this?
-                logging.error(f"Request to node {node_id} failed with status code: {response.status_code}.")
-                sys.exit()  # TODO: This is causing trouble. Transaction file reading stops here.
+                logging.warning(f"REQ TO {node_id} FAILED: [{response.status_code}]: {response.reason}.")
+                # sys.exit()  # TODO: This is causing trouble. Transaction file reading stops here.
 
     def is_next_validator(self, idx=-1):
         return self.next_validator(idx) == self.public_key
@@ -202,13 +202,11 @@ class Node:
             case _:
                 print("Invalid transaction type.")
                 return
-        # print(f"Total transaction cost: {transaction_cost}")
 
-        if self.id == 0:
-            print(f"Cost: {transaction_cost} My balance: {self.my_info.bcc}")
+        print(f"[CREATE TX] Cost: {transaction_cost} My balance: {self.my_info.bcc} My val balance: {self.val_bcc[self.id]}")
         
         if transaction_cost > self.my_info.bcc:
-            print(f"Transaction cannot proceed as the node does not have the required BCCs.")
+            logging.warn(f"My Transaction cannot proceed as the node does not have the required BCCs.")
             time.sleep(5)
             return
 
@@ -222,7 +220,7 @@ class Node:
 
         tx_request = self.tx_builder.create(recv, type, payload)
 
-        # print("[CREATE TX] {}".format(tx_request["hash"]))
+        print("[CREATE TX] {}".format(tx_request["hash"]))
 
         self.transactions.append(tx_request)
         # print("\nMY TX HASHES:")
@@ -237,8 +235,6 @@ class Node:
         Remove the oldest `capacity` received transactions, create a block from
         them and send it to the rest of the nodes.
         """
-
-
         prev_block = self.blockchain.blocks[-1]
         block_txs = self.transactions[:Constants.CAPACITY]
         # print("[MINT BLOCK] WITH TXS:")
@@ -268,13 +264,10 @@ class Node:
         # print("As the validator, I won {:.2f} in fees. Sending block...".format(b.fees()))
         self.my_info.bcc += b.fees()
         self.val_bcc[self.id] += b.fees()
-        # print(b.to_str())
 
         block_request = BlockRequest.from_block_to_request(b)
         self.blockchain.add(b)
         self.broadcast_request(block_request, '/blocks')
-
-
 
     def stake(self, amount):
         self.create_tx(str(Constants.BOOTSTRAP_ID), TransactionType.STAKE.value, amount)

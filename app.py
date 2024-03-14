@@ -38,8 +38,8 @@ print("""
 |____/|_|\___/ \___|_|\_\___|_| |_|\__,_|\__|
 """)
 print("-----------------------------------------------------------")
-
 controller = BootstrapController() if args.bootstrap else NodeController(myIP(), args.port)
+print("\nMy pubkey: ...{}...\n".format(controller.node.public_key[100:110]))
 
 # Add routes / endpoints.
 app.register_blueprint(controller.blueprint, url_prefix='/')
