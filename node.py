@@ -19,6 +19,7 @@ from response_classes.join_response import JoinResponse
 from wallet import Wallet
 from transaction import TransactionBuilder, TransactionType, tx_cost
 
+my_tx = 0
 
 class NodeInfo:
     def __init__(self, ip_address, port, public_key=None, bcc=0):
@@ -64,6 +65,7 @@ class Node:
         # Keep a list of which node (by id) validated each block for testing
         self.validators = []
         self.done = False
+        self.lock = Lock()
         thr = Thread(target=self.poll_capacity)
         thr.start()
         thr2 = Thread(target=self.poll_done)
@@ -180,6 +182,8 @@ class Node:
 
 
     def create_tx(self, recv, type, payload):
+        global my_tx
+
         # Accept IDs instead of public keys as well.
         if recv.isdigit():
             if self.all_nodes.get(int(recv)) is None:
@@ -203,13 +207,14 @@ class Node:
                 print("Invalid transaction type.")
                 return
 
-        print(f"[CREATE TX] Cost: {transaction_cost} My balance: {self.my_info.bcc} My val balance: {self.val_bcc[self.id]}")
+        print(f"[CREATE TX] Cost: {transaction_cost} My balance: {self.my_info.bcc} {self.all_nodes[self.id].bcc} My val balance: {self.val_bcc[self.id]}")
         
         if transaction_cost > self.my_info.bcc:
             logging.warn(f"My Transaction cannot proceed as the node does not have the required BCCs.")
             time.sleep(5)
             return
 
+        self.lock.acquire()
         # Balance updates
         self.my_info.bcc -= transaction_cost
         if type == TransactionType.AMOUNT.value:
@@ -220,13 +225,16 @@ class Node:
 
         tx_request = self.tx_builder.create(recv, type, payload)
 
-        print("[CREATE TX] {}".format(tx_request["hash"]))
+        my_tx += 1
+        print("[CREATE TX {}] {}".format(my_tx, tx_request["hash"]))
 
         self.transactions.append(tx_request)
         # print("\nMY TX HASHES:")
         # for tx in self.transactions:
         #     print(tx["hash"])
         # print("\n")
+
+        self.lock.release()
         self.broadcast_request(tx_request, "/transactions")
 
     def mint_block(self):
@@ -235,6 +243,7 @@ class Node:
         Remove the oldest `capacity` received transactions, create a block from
         them and send it to the rest of the nodes.
         """
+        self.lock.acquire()
         prev_block = self.blockchain.blocks[-1]
         block_txs = self.transactions[:Constants.CAPACITY]
         # print("[MINT BLOCK] WITH TXS:")
@@ -267,6 +276,8 @@ class Node:
 
         block_request = BlockRequest.from_block_to_request(b)
         self.blockchain.add(b)
+        
+        self.lock.release()
         self.broadcast_request(block_request, '/blocks')
 
     def stake(self, amount):

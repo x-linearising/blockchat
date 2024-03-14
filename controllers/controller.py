@@ -25,7 +25,6 @@ class NodeController:
         self.blueprint.add_url_rule("/transactions", "transaction", self.receive_transaction, methods=["POST"])
         self.blueprint.add_url_rule("/blocks", "blocks", self.receive_block, methods=["POST"])
         self.node = Node(ip_address, port)
-        self.lock = Lock()
 
     def after_request(self, response):
         request_path = request.path
@@ -129,12 +128,12 @@ class NodeController:
         """
         Endpoint hit by a node broadcasting a transaction.
         """
-        self.lock.acquire()
+        self.node.lock.acquire()
         tx = request.json
         valid, err = self.process_soft_tx(tx)
         if not valid:
             logging.warning(err)
-            self.lock.release()
+            self.node.lock.release()
             return err, 400
 
         if tx["hash"] not in self.node.pending_tx:
@@ -143,14 +142,14 @@ class NodeController:
             # print("[PENDING TX] will not add {} -- WAS IN PENDING TX LIST".format(tx["hash"]))
             self.node.pending_tx.remove(tx["hash"])
 
-        self.lock.release()
+        self.node.lock.release()
         return '', 200
 
     def set_final_node_list(self):
         """
         Endpoint hit by the bootstrap node, who sends the final list of nodes to all participating nodes.
         """
-        self.lock.acquire()
+        self.node.lock.acquire()
         # Updating node list
         self.node.all_nodes = NodeListRequest.from_request_to_node_info_dict(request.json)
         self.node.val_bcc = {node_id: node_info.bcc for node_id, node_info in self.node.all_nodes.items()}
@@ -168,7 +167,7 @@ class NodeController:
                 self.node.expected_nonce[k] = 0
                 self.node.validated_nonce[k] = 0
 
-        self.lock.release()
+        self.node.lock.release()
         # No need for response body. Responding with status 200.
         return '', 200
 
@@ -176,10 +175,10 @@ class NodeController:
         """
         Endpoint hit by the bootstrap node, who sends the blockchain after bootstrap phase is complete.
         """
-        self.lock.acquire()
+        self.node.lock.acquire()
         self.node.blockchain.blocks = BlockchainRequest.from_request_to_blocks(request.json)
         print("[Bootstrap Phase] Blockchain has been updated successfully.")
-        self.lock.release()
+        self.node.lock.release()
 
         return '', 200
 
@@ -253,7 +252,10 @@ class NodeController:
 
         self.node.blockchain.add(b)
 
-        # print(f"[COMPLETE PROCESS OF BLOCK with idx {b.idx}.]")
+        for i in range(Constants.MAX_NODES):
+            print("{:<2d} {:<7.2f} {:<7.2f}".format(i, self.node.all_nodes[i].bcc, self.node.val_bcc[i]))
+
+        print(f"\n[PROCESS BLOCK with idx {b.idx} DONE]")
 
 
     def receive_block(self):
@@ -262,7 +264,7 @@ class NodeController:
         After checking that the block is valid, adds it to the blockchain
         and calculates the next expected validator.
         """
-        self.lock.acquire()
+        self.node.lock.acquire()
 
         b = BlockRequest.from_request_to_block(request.json)
         self.node.pending_blocks[b.idx] = b
@@ -276,7 +278,7 @@ class NodeController:
         if l > 0:
             print(f"[RECV BLOCK] have {l} pending blocks")
 
-        self.lock.release()
+        self.node.lock.release()
         return "", 200
 
 class BootstrapController(NodeController):
@@ -291,10 +293,9 @@ class BootstrapController(NodeController):
         self.blueprint.add_url_rule("/nodes", "nodes", self.add_node, methods=["POST"])
         self.blueprint.add_url_rule("/transactions", "transactions", self.receive_transaction, methods=["POST"])
         self.blueprint.add_url_rule("/blocks", "blocks", self.receive_block, methods=["POST"])
-        self.lock = Lock()
 
     def after_request(self, response):
-        self.lock.acquire()
+        self.node.lock.acquire()
         request_path = request.path
 
         @response.call_on_close
@@ -306,7 +307,7 @@ class BootstrapController(NodeController):
                 self.node.perform_initial_transactions()
                 self.node.execute_file_transactions()
 
-        self.lock.release()
+        self.node.lock.release()
         return response
 
 
@@ -316,7 +317,7 @@ class BootstrapController(NodeController):
         Adds the node's info (public key, ip, port) to the bootstraps node list and
         returns the node's assigned id.
         """
-        self.lock.acquire()
+        self.node.lock.acquire()
         # Mapping request body to class
 
         join_request = JoinRequest.from_json(request.json)
@@ -341,7 +342,7 @@ class BootstrapController(NodeController):
         response = JoinResponse(self.nodes_counter)
         self.nodes_counter += 1
 
-        self.lock.release()
+        self.node.lock.release()
         return response.to_dict()
 
     def validate_join_request(self, join_request: JoinRequest):
