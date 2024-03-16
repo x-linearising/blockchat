@@ -2,9 +2,10 @@ from os import path
 from helper import myIP, read_pubkey
 
 class Constants:
-    BOOTSTRAP_IP_ADDRESS = myIP()
+    BOOTSTRAP_IP_ADDRESS = "192.168.0.1"
     BOOTSTRAP_PORT = 5000
     BOOTSTRAP_ID = 0
+    # TODO: Fix this.
     BOOTSTRAP_PUBKEY_PATH = path.join(".", "bootstrap_keys", "id_rsa.pub")
     BOOTSTRAP_PUBKEY = read_pubkey(BOOTSTRAP_PUBKEY_PATH)
     BOOTSTRAP_PRIVKEY_PATH = path.join(".", "bootstrap_keys", "id_rsa")
