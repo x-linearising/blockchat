@@ -66,6 +66,7 @@ class Node:
         self.validators = []
         self.done = False
         self.lock = Lock()
+        self.mint_broadcast_lock = Lock()
         thr = Thread(target=self.poll_capacity)
         thr.start()
         thr2 = Thread(target=self.poll_done)
@@ -207,14 +208,17 @@ class Node:
                 print("Invalid transaction type.")
                 return
 
+        self.lock.acquire()
+        self.mint_broadcast_lock.acquire()
         print(f"[CREATE TX] Cost: {transaction_cost} My balance: {self.my_info.bcc} {self.all_nodes[self.id].bcc} My val balance: {self.val_bcc[self.id]}")
-        
+
         if transaction_cost > self.my_info.bcc:
+            self.lock.release()
+            self.mint_broadcast_lock.release()
             logging.warn(f"My Transaction cannot proceed as the node does not have the required BCCs.")
             time.sleep(5)
             return
 
-        self.lock.acquire()
         # Balance updates
         self.my_info.bcc -= transaction_cost
         if type == TransactionType.AMOUNT.value:
@@ -235,6 +239,7 @@ class Node:
         # print("\n")
 
         self.lock.release()
+        self.mint_broadcast_lock.release()
         self.broadcast_request(tx_request, "/transactions")
 
     def mint_block(self):
@@ -276,9 +281,12 @@ class Node:
 
         block_request = BlockRequest.from_block_to_request(b)
         self.blockchain.add(b)
-        
+
         self.lock.release()
+
+        self.mint_broadcast_lock.acquire()
         self.broadcast_request(block_request, '/blocks')
+        self.mint_broadcast_lock.release()
 
     def stake(self, amount):
         self.create_tx(str(Constants.BOOTSTRAP_ID), TransactionType.STAKE.value, amount)
