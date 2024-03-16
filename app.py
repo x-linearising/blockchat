@@ -24,10 +24,13 @@ parser = argparse.ArgumentParser()
 parser.add_argument("-b", "--bootstrap", action = argparse.BooleanOptionalAction, default = False)
 parser.add_argument("-p", "--port", nargs = "?", const = "8000", default = "8000")
 parser.add_argument("-o", "--okeanos", action = argparse.BooleanOptionalAction, default = False)
+parser.add_argument("-f", "--file", action = argparse.BooleanOptionalAction, default = True)
 args = parser.parse_args()
 
 if args.okeanos:
     Constants.BOOTSTRAP_IP_ADDRESS = "192.168.0.1"
+
+print("args_file:", args.file)
 
 print("-----------------------------------------------------------")
 print("""
@@ -41,7 +44,7 @@ print("""
 print("-----------------------------------------------------------")
 
 try:
-    controller = BootstrapController() if args.bootstrap else NodeController(myIP(), args.port)
+    controller = BootstrapController(args.file) if args.bootstrap else NodeController(myIP(), args.port, args.file)
 except BootstrapConnError as e:
     logging.error(e)
     sys.exit(-1)

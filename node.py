@@ -329,7 +329,7 @@ class Node:
         fname = "blockchain" + str(self.id) + ".txt"
         fpath = os.path.join("logs", fname)
         with open(fpath, "w") as f:
-            f.write(self.blockchain.to_str(indent=0) + "\n")
+            f.write(self.blockchain.to_str())
 
         fname = "balance" + str(self.id) + ".txt"
         fpath = os.path.join("logs", fname)
@@ -407,21 +407,16 @@ class Node:
                     s = self.blockchain.to_str() 
                 else:
                     s = self.view_block()
-                print(s)
+                print(s, end="")
                 # print("validators: {}".format(self.validators))
             case "tx":
                 len_sum = 0
-                tabs = 1 * "\t"
-
-                s = tabs + f"transactions: [\n"
+                s = "transactions:\n"
 
                 for i, tx in enumerate(self.transactions):
-                    s += tx_str(tx, True, 2)
-                    if i != len(self.transactions) - 1:
-                        s += "\n"
+                    s += tx_str(tx, True)
                     if tx["contents"]["type"] == TransactionType.MESSAGE.value:
                         len_sum += len(tx["contents"]["message"])
-                s += tabs + "]"
                 print(s)
                 print(f"Sum of lengths of messages = {len_sum}")
                 print(f"TX List length = {len(self.transactions)}")

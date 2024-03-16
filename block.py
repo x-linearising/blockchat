@@ -35,25 +35,21 @@ class Block():
                 "transactions": self.transactions
             }
 
-    def to_str(self, summarized=True, indent=1):
-        tabs = indent * "\t"
-        s = tabs + f"prev hash: {self.prev_hash}\n"
-        s += tabs + f"hash: {self.block_hash}\n"
-        s += tabs +  f"index: {self.idx}\n"
-        s += tabs +  f"timestamp: {self.timestamp}\n"
+    def to_str(self, summarized=True, spaces=0):
+        indent = spaces * " "
+        s = indent +  f"- index: {self.idx}\n"
+        s += indent + f"  prev hash: {self.prev_hash}\n"
+        s += indent + f"  hash: {self.block_hash}\n"
+        s += indent +  f"  timestamp: {self.timestamp}\n"
         if summarized:
-            s += tabs + f"validator: ...{self.validator[100:110]}...\n"
+            s += indent + f"  validator: ...{self.validator[100:110]}...\n"
         else:
-            s += tabs + f"validator: {self.validator}\n"
+            s += indent + f"  validator: {self.validator}\n"
         
-        s += tabs + f"transactions: [\n"
+        s += indent + f"  transactions:\n"
         
         for i, tx in enumerate(self.transactions):
-            s += tx_str(tx, summarized, indent+1)
-            # don't add a newline after the last transaction
-            if i != len(self.transactions) - 1:
-                s += "\n"
-        s += tabs + "]"
+            s += tx_str(tx, summarized, spaces+2) + "\n"
         return s
 
 

@@ -17,7 +17,7 @@ recv_tx = 0
 
 class NodeController:
     
-    def __init__(self, ip_address, port):
+    def __init__(self, ip_address, port, read_file=True):
         self.blueprint = Blueprint("bootstrap blueprint", __name__)
         # equivalent to using @self.blueprint.route on add_node
         # (which wouldn't work because of the self prefix)
@@ -25,6 +25,7 @@ class NodeController:
         self.blueprint.add_url_rule("/blockchain", "blockchain", self.set_initial_blockchain, methods=["POST"])
         self.blueprint.add_url_rule("/transactions", "transaction", self.receive_transaction, methods=["POST"])
         self.blueprint.add_url_rule("/blocks", "blocks", self.receive_block, methods=["POST"])
+        self.read_file = read_file
         try:
             self.node = Node(ip_address, port)
         except BootstrapConnError as e:
@@ -40,7 +41,7 @@ class NodeController:
                 pass
             elif request_path == '/transactions':
                 recv_tx += 1
-                if recv_tx == Constants.MAX_NODES - 1:
+                if self.read_file and recv_tx == Constants.MAX_NODES - 1:
                     print("Received initial BCCs, BROADCASTING FILE TXs")
                     self.node.execute_file_transactions()
 
@@ -283,7 +284,7 @@ class NodeController:
 
 class BootstrapController(NodeController):
 
-    def __init__(self):
+    def __init__(self, read_file=True):
         self.node = Bootstrap()
         self.blueprint = Blueprint("nodes", __name__)
         self.nodes_counter = 1
@@ -293,6 +294,7 @@ class BootstrapController(NodeController):
         self.blueprint.add_url_rule("/nodes", "nodes", self.add_node, methods=["POST"])
         self.blueprint.add_url_rule("/transactions", "transactions", self.receive_transaction, methods=["POST"])
         self.blueprint.add_url_rule("/blocks", "blocks", self.receive_block, methods=["POST"])
+        self.read_file = read_file
 
     def after_request(self, response):
         self.node.lock.acquire()
@@ -305,7 +307,8 @@ class BootstrapController(NodeController):
                 self.node.broadcast_blockchain()
                 self.node.initialize_stakes()
                 self.node.perform_initial_transactions()
-                self.node.execute_file_transactions()
+                if self.read_file:
+                    self.node.execute_file_transactions()
 
         self.node.lock.release()
         return response
