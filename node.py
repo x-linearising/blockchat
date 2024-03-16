@@ -126,19 +126,21 @@ class Node:
         # Make request to boostrap node
         join_request = JoinRequest(pubkey, ip, port)
 
-        join_response = requests.post(
-            Constants.BOOTSTRAP_URL + "/nodes",
-            json=join_request.to_dict(),
-            headers=Constants.JSON_HEADER,
-        )
+        try:
+            join_response = requests.post(
+                Constants.BOOTSTRAP_URL + "/nodes",
+                json=join_request.to_dict(),
+                headers=Constants.JSON_HEADER,
+            )
+        except requests.exceptions.ConnectionError:
+            raise helper.BootstrapConnError("Connection to bootstrap node failed -- is it running?")
 
         if join_response.ok:
             response = JoinResponse.from_json(join_response.json())
             self.id = response.id
             logging.info(f"Joined the network successfully with id {self.id}. Waiting for bootstrap phase completion.")
         else:
-            logging.error(f"""Could not join the network. Bootstrap node responded 
-                          with status [{join_response.status_code}] and message [{join_response.text}].""")
+            raise helper.BootstrapConnError(join_response.text)
 
     def broadcast_request(self, request_body, endpoint):
         for node_id, node in self.all_nodes.items():

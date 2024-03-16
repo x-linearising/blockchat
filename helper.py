@@ -17,6 +17,11 @@ class JSONSerializable:
         else:
             raise TypeError("Object is not JSON serializable")
 
+class BootstrapConnError(Exception):
+    def __init__(self, msg):
+        super().__init__(msg)
+        self.msg = msg
+
 def myIP():
     # TODO: this may return 127.0.0.1 on some machines instead of the local IP addr.
     # no problem when running locally, but we don't want our online nodes to believe
