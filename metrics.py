@@ -21,7 +21,7 @@ if __name__ == "__main__":
     for i, block in enumerate(blockchain):
         # skip the genesis block
         if i == 0:
-            pass
+            continue
         try:
             validator_counts[block["validator"]] += 1
         except KeyError:
@@ -31,5 +31,5 @@ if __name__ == "__main__":
     print("Throughput (TX/sec)     : {:2f}".format(1/avg_tx_time))
 
     for k, v in validator_counts.items():
-        print("Node {} was validated {} blocks".format(k, v))
+        print("Node {} validated {} blocks".format(k, v))
 
