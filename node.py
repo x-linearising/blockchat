@@ -39,11 +39,6 @@ class Node:
         self.hard_bcc = {}
         self.pending_blocks = {}
         
-        # Move this where the genesis block is received!!
-        if node_id is None:
-            self.hard_bcc = {i : 0 for i in range(1, Constants.MAX_NODES)}
-            self.hard_bcc[0] = Constants.STARTING_BCC_PER_NODE * Constants.MAX_NODES
-
         # Only the bootstrap node creates a Node object with known id
         if node_id is None:
             self.join_network(ip_address, port, self.public_key)  # TODO: Maybe move this in Controller?
@@ -213,7 +208,7 @@ class Node:
             self.lock.release()
             self.mint_broadcast_lock.release()
             logging.warn(f"My Transaction cannot proceed as the node does not have the required BCCs.")
-            time.sleep(5)
+            # time.sleep(5)
             return
 
         # Balance updates

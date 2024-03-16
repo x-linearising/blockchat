@@ -154,11 +154,15 @@ class NodeController:
         Endpoint hit by the bootstrap node, who sends the final list of nodes to all participating nodes.
         """
         self.node.lock.acquire()
-        # Updating node list
+        
+        # Received final node list. Soft and hard BCC are initialized to zero.
         self.node.all_nodes = NodeListRequest.from_request_to_node_info_dict(request.json)
-        self.node.hard_bcc = {node_id: node_info.bcc for node_id, node_info in self.node.all_nodes.items()}
+        self.node.hard_bcc = {node_id: 0 for node_id in self.node.all_nodes.keys()}
         self.node.my_info = self.node.all_nodes[self.node.id]
         logging.info(f"[Bootstrap Phase] Received NodeInfo for {len(request.json)} nodes.")
+
+        for i in range(Constants.MAX_NODES):
+            print("{} {} {}".format(i, self.node.all_nodes[i].bcc, self.node.hard_bcc[i]))
 
         # Initialize stakes at predefined value
         self.node.initialize_stakes()
@@ -180,8 +184,15 @@ class NodeController:
         Endpoint hit by the bootstrap node, who sends the blockchain after bootstrap phase is complete.
         """
         self.node.lock.acquire()
+
         self.node.blockchain.blocks = BlockchainRequest.from_request_to_blocks(request.json)
-        print("[Bootstrap Phase] Blockchain has been updated successfully.")
+        init_bcc = self.node.blockchain.blocks[0].transactions[0]["contents"]["amount"]
+        # Initialize soft and hard states of bootstrap's bcc with the amount
+        # given to it by the genesis transaction.
+        self.node.all_nodes[Constants.BOOTSTRAP_ID].bcc += init_bcc
+        self.node.hard_bcc[Constants.BOOTSTRAP_ID] += init_bcc
+
+        logging.info("[Bootstrap Phase] Blockchain has been updated successfully.")
         self.node.lock.release()
 
         return '', 200

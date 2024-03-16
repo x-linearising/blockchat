@@ -16,7 +16,7 @@ def user_interface(node, prompt_str=">>> "):
         print("")
 
 app = Flask(__name__)
-logging.basicConfig(level=logging.WARNING)
+logging.basicConfig(level=logging.INFO)
 log = logging.getLogger('werkzeug')
 log.setLevel(logging.WARNING)
 
