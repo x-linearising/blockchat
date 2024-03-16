@@ -51,7 +51,7 @@ print("\nMy pubkey: ...{}...\n".format(controller.node.public_key[100:110]))
 # Add routes / endpoints.
 app.register_blueprint(controller.blueprint, url_prefix='/')
 app.after_request(controller.after_request)
-app.run(host="0.0.0.0", port=Constants.BOOTSTRAP_PORT if args.bootstrap else args.port)
-
 t = Thread(target=user_interface, args=[controller.node, ""])
 t.start()
+app.run(host="0.0.0.0", port=Constants.BOOTSTRAP_PORT if args.bootstrap else args.port)
+
