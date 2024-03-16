@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-
+import sys
 import logging
 import argparse
 from threading import Thread
@@ -7,7 +7,7 @@ from flask import Flask
 from flask_restful import Api
 from controllers.controller import BootstrapController, NodeController
 from constants import Constants
-from helper import myIP
+from helper import myIP, BootstrapConnError
 
 def user_interface(node, prompt_str=">>> "):
     while True:
@@ -38,13 +38,18 @@ print("""
 |____/|_|\___/ \___|_|\_\___|_| |_|\__,_|\__|
 """)
 print("-----------------------------------------------------------")
-controller = BootstrapController() if args.bootstrap else NodeController(myIP(), args.port)
+
+try:
+    controller = BootstrapController() if args.bootstrap else NodeController(myIP(), args.port)
+except BootstrapConnError as e:
+    logging.error(e)
+    sys.exit(-1)
+
 print("\nMy pubkey: ...{}...\n".format(controller.node.public_key[100:110]))
 
 # Add routes / endpoints.
 app.register_blueprint(controller.blueprint, url_prefix='/')
 app.after_request(controller.after_request)
-
+app.run(host="0.0.0.0", port=Constants.BOOTSTRAP_PORT if args.bootstrap else args.port)
 t = Thread(target=user_interface, args=[controller.node, ""])
 t.start()
-app.run(host="0.0.0.0", port=Constants.BOOTSTRAP_PORT if args.bootstrap else args.port)

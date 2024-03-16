@@ -1,7 +1,8 @@
 import logging
 from threading import Lock
-from flask import Blueprint, abort, request
+from flask import Blueprint, request
 
+from helper import BootstrapConnError
 from node import Node, NodeInfo
 from bootstrap import Bootstrap
 from request_classes.block_request import BlockRequest
@@ -24,7 +25,10 @@ class NodeController:
         self.blueprint.add_url_rule("/blockchain", "blockchain", self.set_initial_blockchain, methods=["POST"])
         self.blueprint.add_url_rule("/transactions", "transaction", self.receive_transaction, methods=["POST"])
         self.blueprint.add_url_rule("/blocks", "blocks", self.receive_block, methods=["POST"])
-        self.node = Node(ip_address, port)
+        try:
+            self.node = Node(ip_address, port)
+        except BootstrapConnError as e:
+            raise BootstrapConnError(e.msg)
 
     def after_request(self, response):
         request_path = request.path
@@ -325,7 +329,11 @@ class BootstrapController(NodeController):
             .format(request.json["ip_address"], request.json["port"]))
 
         # Performing validations
-        self.validate_join_request(join_request)
+        err = self.validate_join_request(join_request)
+        if err:
+            print(err)
+            self.node.lock.release()
+            return(err, 400)
 
         # Adding node
         self.node.all_nodes[self.nodes_counter] = NodeInfo(
@@ -346,12 +354,10 @@ class BootstrapController(NodeController):
         return response.to_dict()
 
     def validate_join_request(self, join_request: JoinRequest):
+        err = None
         if self.nodes_counter == Constants.MAX_NODES:
-            log_message = "Bad request: Bootstrapping phase is over."
-            logging.warning(log_message)
-            abort(400, description=log_message)
-
+            err = "Bad request: Bootstrapping phase is over."
         if self.node.node_has_joined(join_request.ip_address, join_request.port):
-            log_message = "Bad request: Node with given ip and port has already been added."
-            logging.warning(log_message)
-            abort(400, description=log_message)
+            err = "Bad request: Node with given ip and port has already been added."
+        return err
+
