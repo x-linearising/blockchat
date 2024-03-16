@@ -143,7 +143,6 @@ class NodeController:
         if tx["hash"] not in self.node.pending_tx:
             self.node.transactions.append(tx)
         else:
-            # print("[PENDING TX] will not add {} -- WAS IN PENDING TX LIST".format(tx["hash"]))
             self.node.pending_tx.remove(tx["hash"])
 
         self.node.lock.release()
@@ -160,9 +159,6 @@ class NodeController:
         self.node.hard_bcc = {node_id: 0 for node_id in self.node.all_nodes.keys()}
         self.node.my_info = self.node.all_nodes[self.node.id]
         logging.info(f"[Bootstrap Phase] Received NodeInfo for {len(request.json)} nodes.")
-
-        for i in range(Constants.MAX_NODES):
-            print("{} {} {}".format(i, self.node.all_nodes[i].bcc, self.node.hard_bcc[i]))
 
         # Initialize stakes at predefined value
         self.node.initialize_stakes()
@@ -225,9 +221,8 @@ class NodeController:
         # hash to the pending_tx list.
         block_tx_hashes = [tx["hash"] for tx in b.transactions]
         node_tx_hashes = [tx["hash"] for tx in self.node.transactions]
-        diff = [i for i in block_tx_hashes if i not in node_tx_hashes]
 
-        for tx_hash in diff:
+        for tx_hash in [i for i in block_tx_hashes if i not in node_tx_hashes]:
             self.node.pending_tx.add(tx_hash)
 
         # print("Block TX")
@@ -240,18 +235,8 @@ class NodeController:
         # for i in diff:
         #     print(i)
 
-        # print("[RECV BLOCK] PENDING TX LEN {}".format(len(self.node.pending_tx)))
-
         # Remove txs included in the block from this node's list
-        prev = len(self.node.transactions)
         self.node.transactions = [i for i in self.node.transactions if i not in b.transactions]
-        after = len(self.node.transactions)
-
-        # print("[RECV BLOCK] TX LEN BEFORE: {} AFTER: {}".format(prev, after))
-        # print("\nMy TX AFTER")
-        # for i in self.node.transactions:
-        #     print(i["hash"])
-
 
         # Reset soft state to current hard state
         for k in self.node.hard_bcc.keys():
