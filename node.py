@@ -8,8 +8,7 @@ from functools import reduce
 from random import randint
 from threading import Thread, Lock
 
-import helper
-from helper import tx_str
+from helper import tx_str, url_str, read_transaction_file, BootstrapConnError
 from block import Block
 from blockchain import Blockchain
 from constants import Constants
@@ -27,10 +26,6 @@ class NodeInfo:
         self.port = port
         self.public_key = public_key
         self.bcc = bcc
-
-    def get_node_url(self):
-        url = f"http://{self.ip_address}:{self.port}"
-        return url
 
 
 class Node:
@@ -129,19 +124,19 @@ class Node:
 
         try:
             join_response = requests.post(
-                Constants.BOOTSTRAP_URL + "/nodes",
+                url_str(Constants.BOOTSTRAP_IP_ADDRESS, Constants.BOOTSTRAP_PORT) + "/nodes",
                 json=join_request.to_dict(),
                 headers=Constants.JSON_HEADER,
             )
         except requests.exceptions.ConnectionError:
-            raise helper.BootstrapConnError("Connection to bootstrap node failed -- is it running?")
+            raise BootstrapConnError("Connection to bootstrap node failed -- is it running?")
 
         if join_response.ok:
             response = JoinResponse.from_json(join_response.json())
             self.id = response.id
             print(f"Joined the network successfully with id {self.id}. Waiting for bootstrap phase completion.")
         else:
-            raise helper.BootstrapConnError(join_response.text)
+            raise BootstrapConnError(join_response.text)
 
     def broadcast_request(self, request_body, endpoint):
         for node_id, node in self.all_nodes.items():
@@ -152,7 +147,7 @@ class Node:
             # if endpoint == "/blocks":
                 # print(f"Sending block to {node_id}")
 
-            response = requests.post(node.get_node_url() + endpoint,
+            response = requests.post(url_str(node.ip_address, node.port) + endpoint,
                                      json=request_body,
                                      headers=Constants.JSON_HEADER)
 
@@ -313,7 +308,7 @@ class Node:
 
 
     def execute_file_transactions(self):
-        receivers, messages = helper.read_transaction_file(self.id)
+        receivers, messages = read_transaction_file(self.id)
         # receivers, messages = self.read_simple_transaction_file()
         for receiver, message in zip(receivers, messages):
             # time.sleep(0.1 + random.random())

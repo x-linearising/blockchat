@@ -28,6 +28,9 @@ def myIP():
     # 127.0.0.1 is their IP
     return gethostbyname(gethostname())
 
+def url_str(ip, port):
+    return f"http://{ip}:{port}"
+
 def read_pubkey(path):
     with open(path, "rb") as f:
         k = load_ssh_public_key(f.read()) \

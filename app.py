@@ -23,8 +23,11 @@ log.setLevel(logging.WARNING)
 parser = argparse.ArgumentParser()
 parser.add_argument("-b", "--bootstrap", action = argparse.BooleanOptionalAction, default = False)
 parser.add_argument("-p", "--port", nargs = "?", const = "8000", default = "8000")
+parser.add_argument("-o", "--okeanos", action = argparse.BooleanOptionalAction, default = False)
 args = parser.parse_args()
-# args.bootstrap = True if args.port == '5000' else False
+
+if args.okeanos:
+    Constants.BOOTSTRAP_IP_ADDRESS = "192.168.0.1"
 
 print("-----------------------------------------------------------")
 print("""
@@ -49,5 +52,6 @@ print("\nMy pubkey: ...{}...\n".format(controller.node.public_key[100:110]))
 app.register_blueprint(controller.blueprint, url_prefix='/')
 app.after_request(controller.after_request)
 app.run(host="0.0.0.0", port=Constants.BOOTSTRAP_PORT if args.bootstrap else args.port)
+
 t = Thread(target=user_interface, args=[controller.node, ""])
 t.start()
