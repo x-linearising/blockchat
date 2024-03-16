@@ -4,7 +4,6 @@ import logging
 import argparse
 from threading import Thread
 from flask import Flask
-from flask_restful import Api
 from controllers.controller import BootstrapController, NodeController
 from constants import Constants
 from helper import myIP, BootstrapConnError
@@ -17,7 +16,6 @@ def user_interface(node, prompt_str=">>> "):
         print("")
 
 app = Flask(__name__)
-api = Api(app)
 logging.basicConfig(level=logging.WARNING)
 log = logging.getLogger('werkzeug')
 log.setLevel(logging.WARNING)
