@@ -30,8 +30,6 @@ args = parser.parse_args()
 if args.okeanos:
     Constants.BOOTSTRAP_IP_ADDRESS = "192.168.0.1"
 
-print("args_file:", args.file)
-
 print("-----------------------------------------------------------")
 print("""
  ____  _            _        _           _   
