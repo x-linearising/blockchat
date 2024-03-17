@@ -1,3 +1,4 @@
+import os
 import json
 import struct
 from socket import gethostname, gethostbyname
@@ -81,7 +82,10 @@ def tx_str(tx, summarized=True, spaces=0):
 def read_transaction_file(node_id):
     receivers = []
     messages = []
-    with open(f"input/trans{node_id}.txt", 'r') as file:
+    src_path = os.path.dirname(os.path.abspath(__file__))
+    fname = f"trans{node_id}.txt"
+    fpath = os.path.join(src_path, "input", fname)
+    with open(fpath, 'r') as file:
         lines = file.readlines()
 
         for line in lines:

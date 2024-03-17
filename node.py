@@ -317,8 +317,9 @@ class Node:
 
     def dump_logs(self):
         # Create log directory if it doesn't exist
-        if not os.path.exists("logs"):
-            os.mkdir("logs")
+        log_path = os.path.join(Constants.SRC_PATH, "logs")
+        if not os.path.exists(log_path):
+            os.mkdir(log_path)
 
         # fname = "validators" + str(self.id) + ".txt"
         # fpath = path.join(".", "logs", fname)
@@ -327,12 +328,12 @@ class Node:
         #         f.write(str(v) + "\n")
         
         fname = "blockchain" + str(self.id) + ".txt"
-        fpath = os.path.join("logs", fname)
+        fpath = os.path.join(log_path, fname)
         with open(fpath, "w") as f:
             f.write(self.blockchain.to_str())
 
         fname = "balance" + str(self.id) + ".txt"
-        fpath = os.path.join("logs", fname)
+        fpath = os.path.join(log_path, fname)
         with open(fpath, "w") as f:
             f.write(self.balance(add_mark=False))  
 

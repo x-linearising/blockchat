@@ -1,14 +1,15 @@
-from os import path
+import os
 from helper import myIP, read_pubkey
 
 class Constants:
+    SRC_PATH = os.path.dirname(os.path.abspath(__file__))
+
     BOOTSTRAP_IP_ADDRESS = "127.0.0.1"
     BOOTSTRAP_PORT = 5000
     BOOTSTRAP_ID = 0
-    # TODO: Fix this.
-    BOOTSTRAP_PUBKEY_PATH = path.join(".", "bootstrap_keys", "id_rsa.pub")
+    BOOTSTRAP_PUBKEY_PATH = os.path.join(SRC_PATH, "bootstrap_keys", "id_rsa.pub")
     BOOTSTRAP_PUBKEY = read_pubkey(BOOTSTRAP_PUBKEY_PATH)
-    BOOTSTRAP_PRIVKEY_PATH = path.join(".", "bootstrap_keys", "id_rsa")
+    BOOTSTRAP_PRIVKEY_PATH = os.path.join(SRC_PATH, "bootstrap_keys", "id_rsa")
 
     MAX_NODES = 3
     JSON_HEADER = {'Content-Type': 'application/json'}
