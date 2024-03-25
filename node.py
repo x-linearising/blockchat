@@ -54,7 +54,6 @@ class Node:
         self.blockchain = Blockchain()
         # Keep a list of which node (by id) validated each block for testing
         self.validators = []
-        self.done = False
         self.lock = Lock()
         self.mint_broadcast_lock = Lock()
         thr = Thread(target=self.poll_capacity)
@@ -79,14 +78,17 @@ class Node:
                 time.sleep(0)
 
     def poll_done(self):
+        time.sleep(3)
+        last_len = 0
         while True:
-            if self.done:
-                time.sleep(10)
-                print("Dumping logs")
+            cur_len = len(self.blockchain)
+            if cur_len == last_len:
+                print("!!! DUMPING LOGS !!!")
                 self.dump_logs()
                 break
             else:
-                time.sleep(0)
+                last_len = cur_len
+                time.sleep(3)
 
     def initialize_stakes(self):
         for node_id, node_info in self.all_nodes.items():
@@ -202,7 +204,13 @@ class Node:
 
         self.lock.acquire()
         self.mint_broadcast_lock.acquire()
-        print(f"[CREATE TX] Cost: {transaction_cost} My balance: {self.my_info.bcc} {self.all_nodes[self.id].bcc} My val balance: {self.hard_bcc[self.id]}")
+        my_tx += 1
+        logging.info("[CREATE TX {}] Cost: {} My balance: {} My val balance: {}".format(
+            my_tx,
+            transaction_cost,
+            self.my_info.bcc,
+            self.hard_bcc[self.id]
+        ))
 
         if transaction_cost > self.my_info.bcc:
             self.lock.release()
@@ -221,8 +229,7 @@ class Node:
 
         tx_request = self.tx_builder.create(recv, type, payload)
 
-        my_tx += 1
-        print("[CREATE TX {}] {}".format(my_tx, tx_request["hash"]))
+        logging.info("[CREATE TX {}] Hash: {}".format(my_tx, tx_request["hash"]))
 
         self.transactions.append(tx_request)
         # print("\nMY TX HASHES:")
@@ -253,7 +260,7 @@ class Node:
         b = Block(prev_block.idx+1, time.time(), block_txs, self.public_key, prev_block.block_hash)
         b.set_hash()
 
-        print("[MINT BLOCK with idx {} VAL = {}]".format(prev_block.idx+1, self.id))
+        logging.info(f"[MINT BLOCK] idx: {prev_block.idx+1}")
 
         # Update the amount of validated BCCs for each node.
         for tx in block_txs:
@@ -312,8 +319,6 @@ class Node:
                 continue
 
             self.create_tx(self.all_nodes[receiver].public_key, TransactionType.MESSAGE.value, message[:-1])
-        self.done = True
-
 
     def dump_logs(self):
         # Create log directory if it doesn't exist

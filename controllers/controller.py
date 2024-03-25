@@ -195,14 +195,9 @@ class NodeController:
         return '', 200
 
     def process_block(self, b):
-
         idx = b.idx - 1
 
-        print("[PROCESS BLOCK with idx {} VAL = {} EXP_VAL = {}]".format(
-            b.idx,
-            b.validator[100:110],
-            self.node.next_validator(idx)[100:110]
-            ))
+        logging.info(f"[PROCESS BLOCK] idx: {b.idx}")
         
         if not b.validate(self.node.next_validator(idx), self.node.blockchain.blocks[idx].block_hash):
             return
@@ -253,11 +248,7 @@ class NodeController:
 
         self.node.blockchain.add(b)
 
-        # for i in range(Constants.MAX_NODES):
-        #     print("{:<2d} {:<7.2f} {:<7.2f}".format(i, self.node.all_nodes[i].bcc, self.node.hard_bcc[i]))
-
-        print(f"\n[PROCESS BLOCK with idx {b.idx} DONE]")
-
+        logging.info(f"[PROCESS BLOCK] idx: {b.idx} DONE")
 
     def receive_block(self):
         """

@@ -11,7 +11,7 @@ class Constants:
     BOOTSTRAP_PUBKEY = read_pubkey(BOOTSTRAP_PUBKEY_PATH)
     BOOTSTRAP_PRIVKEY_PATH = os.path.join(SRC_PATH, "bootstrap_keys", "id_rsa")
 
-    MAX_NODES = 3
+    MAX_NODES = 10
     JSON_HEADER = {'Content-Type': 'application/json'}
     CAPACITY = 2
     STARTING_BCC_PER_NODE = 1000
