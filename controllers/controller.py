@@ -27,7 +27,7 @@ class NodeController:
         self.blueprint.add_url_rule("/blocks", "blocks", self.receive_block, methods=["POST"])
         self.read_file = read_file
         try:
-            self.node = Node(ip_address, port)
+            self.node = Node(ip_address, port, read_file=read_file)
         except BootstrapConnError as e:
             raise BootstrapConnError(e.msg)
 
@@ -276,7 +276,7 @@ class NodeController:
 class BootstrapController(NodeController):
 
     def __init__(self, read_file=True):
-        self.node = Bootstrap()
+        self.node = Bootstrap(read_file=read_file)
         self.blueprint = Blueprint("nodes", __name__)
         self.nodes_counter = 1
         self.is_bootstrapping_phase_over = False

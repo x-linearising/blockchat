@@ -29,7 +29,7 @@ class NodeInfo:
 
 
 class Node:
-    def __init__(self, ip_address, port, node_id=None, path=None):
+    def __init__(self, ip_address, port, node_id=None, path=None, read_file=True):
         self.wallet = Wallet(path)
         self.tx_builder = TransactionBuilder(self.wallet)
         self.public_key = self.wallet.public_key
@@ -58,8 +58,9 @@ class Node:
         self.mint_broadcast_lock = Lock()
         thr = Thread(target=self.poll_capacity)
         thr.start()
-        thr2 = Thread(target=self.poll_done)
-        thr2.start()
+        if read_file:
+            thr2 = Thread(target=self.poll_done)
+            thr2.start()
  
     def poll_capacity(self):
         # Do not start minting until all nodes have received their BCCs.
@@ -78,7 +79,15 @@ class Node:
                 time.sleep(0)
 
     def poll_done(self):
-        time.sleep(3)
+        """
+        Thread function that polls the length of the blockchain every 3 seconds.
+        When it stops growing, assume that the message passing is finished and
+        dump logs.
+        """
+        # Wait until all nodes have connected to the network
+        while len(self.all_nodes) != Constants.MAX_NODES:
+            time.sleep(1)
+        
         last_len = 0
         while True:
             cur_len = len(self.blockchain)

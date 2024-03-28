@@ -10,11 +10,14 @@ from transaction import TransactionType
 
 
 class Bootstrap(Node):
-    def __init__(self):
-        super().__init__(Constants.BOOTSTRAP_IP_ADDRESS,
-                         Constants.BOOTSTRAP_PORT,
-                         Constants.BOOTSTRAP_ID,
-                         Constants.BOOTSTRAP_PRIVKEY_PATH)
+    def __init__(self, read_file=True):
+        super().__init__(
+            Constants.BOOTSTRAP_IP_ADDRESS,
+            Constants.BOOTSTRAP_PORT,
+            Constants.BOOTSTRAP_ID,
+            Constants.BOOTSTRAP_PRIVKEY_PATH,
+            read_file=read_file
+        )
         self.my_info = NodeInfo(
             Constants.BOOTSTRAP_IP_ADDRESS,
             Constants.BOOTSTRAP_PORT,
