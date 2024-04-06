@@ -402,6 +402,9 @@ class Node:
         # lstrip to remove leading whitespace, if any
         items = line.lstrip().split(" ")
         command_name = items[0]
+        if len(self.all_nodes) != Constants.MAX_NODES and command_name != "help":
+            print("Bootstrap phase is not yet completed.")
+            return
         match command_name:
             case "t":
                 try:
