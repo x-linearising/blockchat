@@ -1,0 +1,58 @@
+################################################################
+
+MAX NODES = 10
+CAPACITY = 5
+STAKE = 10
+
+Average block time (sec): 0.628400
+Throughput (TX/sec)     : 7.956711
+Node ...V5k3hXnweh... validated 17 blocks
+Node ...HCo638I596... validated 12 blocks
+Node ...yQ2FhI16Z3... validated 19 blocks
+Node ...lvqQxdKDnh... validated 11 blocks
+Node ...qxZy/vV506... validated 14 blocks
+Node ...lSJ2K/B2OE... validated 13 blocks
+Node ...5rgjRau/w+... validated 13 blocks
+Node ...8eT5+VkY7o... validated 10 blocks
+Node ...SKQ9g/mXtg... validated 17 blocks
+Node ...SXagOoeJcx... validated 15 blocks
+
+################################################################
+
+MAX NODES = 10
+CAPACITY = 10
+STAKE = 10
+
+Average block time (sec): 0.447901
+Throughput (TX/sec)     : 22.326371
+Node ...iCV4KuJ9pa... validated 12 blocks
+Node ...7GObEsCg1g... validated 8 blocks
+Node ...5k55LZ0zUM... validated 7 blocks
+Node ...vYmHaaczIt... validated 12 blocks
+Node ...VNWqVbP4/P... validated 6 blocks
+Node ...t9szVwtIE+... validated 9 blocks
+Node ...NBnTETF3tJ... validated 9 blocks
+Node ...5rgjRau/w+... validated 13 blocks
+Node ...q0jBOIdafi... validated 8 blocks
+Node ...y1XTle1O++... validated 4 blocks
+
+################################################################
+
+MAX NODES = 10
+CAPACITY = 20
+STAKE = 10
+
+Average block time (sec): 0.433343
+Throughput (TX/sec)     : 46.152812
+Node ...YG68FBzXRG... validated 4 blocks
+Node ...QFfPbU3KV3... validated 6 blocks
+Node ...sZOnfiU9kE... validated 4 blocks
+Node ...SpQyCaXm6L... validated 3 blocks
+Node ...i8qcxEhlR1... validated 6 blocks
+Node ...ZlB8XohYeO... validated 5 blocks
+Node .../S0TUHv35v... validated 6 blocks
+Node ...Hn/wyxCnPW... validated 2 blocks
+Node ...5rgjRau/w+... validated 3 blocks
+Node ...t8hV2sA04D... validated 8 blocks
+
+################################################################

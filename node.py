@@ -101,10 +101,11 @@ class Node:
 
     def initialize_stakes(self):
         for node_id, node_info in self.all_nodes.items():
-            self.soft_stakes[node_id] = Constants.INITIAL_STAKE
-            self.hard_stakes[node_id] = Constants.INITIAL_STAKE
-            self.all_nodes[node_id].bcc -= Constants.INITIAL_STAKE
-            self.hard_bcc[node_id] -= Constants.INITIAL_STAKE
+            initial_stake = Constants.BOOTSTRAP_INITIAL_STAKE if node_id == Constants.BOOTSTRAP_ID else Constants.INITIAL_STAKE
+            self.soft_stakes[node_id] = initial_stake
+            self.hard_stakes[node_id] = initial_stake
+            self.all_nodes[node_id].bcc -= initial_stake
+            self.hard_bcc[node_id] -= initial_stake
         return self.soft_stakes
 
     def get_node_info_by_public_key(self, public_key):

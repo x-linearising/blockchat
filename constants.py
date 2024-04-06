@@ -10,10 +10,11 @@ class Constants:
     BOOTSTRAP_PUBKEY_PATH = os.path.join(SRC_PATH, "bootstrap_keys", "id_rsa.pub")
     BOOTSTRAP_PUBKEY = read_pubkey(BOOTSTRAP_PUBKEY_PATH)
     BOOTSTRAP_PRIVKEY_PATH = os.path.join(SRC_PATH, "bootstrap_keys", "id_rsa")
+    BOOTSTRAP_INITIAL_STAKE = 100
 
-    MAX_NODES = 10
+    MAX_NODES = 5
     JSON_HEADER = {'Content-Type': 'application/json'}
-    CAPACITY = 20
+    CAPACITY = 5
     STARTING_BCC_PER_NODE = 1000
     TRANSFER_FEE_MULTIPLIER = 1.03
     INITIAL_STAKE = 10
