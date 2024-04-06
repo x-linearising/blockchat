@@ -1,0 +1,16 @@
+################################################################
+
+MAX NODES = 5
+CAPACITY = 5
+STAKE OF BOOTSTRAP = 100
+STAKE OF OTHERS = 10
+
+Average block time (sec): 0.191813
+Throughput (TX/sec)     : 26.067066
+Node ...5rgjRau/w+... validated 30 blocks
+Node ...G37P5H28hy... validated 5 blocks
+Node ...0JFhbHVtrO... validated 1 blocks
+Node ...KpRWx2FYot... validated 3 blocks
+Node ...8E5LdEGDo+... validated 4 blocks
+
+################################################################
