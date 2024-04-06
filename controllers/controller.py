@@ -17,7 +17,7 @@ recv_tx = 0
 
 class NodeController:
     
-    def __init__(self, ip_address, port):
+    def __init__(self, ip_address, port, read_file=True):
         self.blueprint = Blueprint("bootstrap blueprint", __name__)
         # equivalent to using @self.blueprint.route on add_node
         # (which wouldn't work because of the self prefix)
@@ -25,8 +25,9 @@ class NodeController:
         self.blueprint.add_url_rule("/blockchain", "blockchain", self.set_initial_blockchain, methods=["POST"])
         self.blueprint.add_url_rule("/transactions", "transaction", self.receive_transaction, methods=["POST"])
         self.blueprint.add_url_rule("/blocks", "blocks", self.receive_block, methods=["POST"])
+        self.read_file = read_file
         try:
-            self.node = Node(ip_address, port)
+            self.node = Node(ip_address, port, read_file=read_file)
         except BootstrapConnError as e:
             raise BootstrapConnError(e.msg)
 
@@ -40,7 +41,7 @@ class NodeController:
                 pass
             elif request_path == '/transactions':
                 recv_tx += 1
-                if recv_tx == Constants.MAX_NODES - 1:
+                if self.read_file and recv_tx == Constants.MAX_NODES - 1:
                     print("Received initial BCCs, BROADCASTING FILE TXs")
                     self.node.execute_file_transactions()
 
@@ -58,14 +59,14 @@ class NodeController:
         recv_info = self.node.get_node_info_by_public_key(recv_public_key)
         recv_id = self.node.get_node_id_by_public_key(recv_public_key)
         
-        transaction_cost = tx_cost(tx_contents, self.node.stakes[sender_id])
+        transaction_cost = tx_cost(tx_contents, self.node.soft_stakes[sender_id])
         if transaction_cost is None:
             err = "Invalid transaction type was detected."
             logging.warning(err)
             return False, err
 
         # Transaction validations
-        if not verify_tx(tx, self.node.expected_nonce[sender_id]):
+        if not verify_tx(tx, self.node.soft_nonce[sender_id]):
             return False, "[SOFT] Invalid signature."
         if transaction_cost > sender_info.bcc:   # Stakes are not contained in bcc attribute.
             return False, "[SOFT] Not enough bcc to carry out transaction."
@@ -74,13 +75,13 @@ class NodeController:
         # since senders wait for ACKs before continuing.
         # Therefore the scenario of receiving the message w/ nonce n after n+1 is
         # impossible 
-        self.node.expected_nonce[sender_id] += 1
+        self.node.soft_nonce[sender_id] += 1
 
         # BCCs and transaction list updates
         sender_info.bcc -= transaction_cost
 
         if tx_contents["type"] == TransactionType.STAKE.value:
-            self.node.stakes[sender_id] = tx_contents["amount"]
+            self.node.soft_stakes[sender_id] = tx_contents["amount"]
         elif tx_contents["type"] == TransactionType.AMOUNT.value:
             recv_info.bcc += tx_contents["amount"]
 
@@ -96,16 +97,16 @@ class NodeController:
         recv_public_key = tx_contents["recv_addr"]
         recv_id = self.node.get_node_id_by_public_key(recv_public_key)
         
-        transaction_cost = tx_cost(tx_contents, self.node.validated_stakes[sender_id])
+        transaction_cost = tx_cost(tx_contents, self.node.hard_stakes[sender_id])
         if transaction_cost is None:
             err = "Invalid transaction type was detected."
             logging.warning(err)
             return False, err
 
         # Transaction validations
-        if not verify_tx(tx, self.node.validated_nonce[sender_id]):
+        if not verify_tx(tx, self.node.hard_nonce[sender_id]):
             return False, "[HARD] Invalid signature."
-        if transaction_cost > self.node.val_bcc[sender_id]:   # Stakes are not contained in bcc attribute.
+        if transaction_cost > self.node.hard_bcc[sender_id]:   # Stakes are not contained in bcc attribute.
             return False, "[HARD] Not enough bcc to carry out transaction."
 
         # if the validated transactions jump from nonce n-1 to n+1,
@@ -116,15 +117,15 @@ class NodeController:
             if node_tx["contents"]["nonce"] < tx_contents["nonce"]:
                 del self.node.transactions[i]
 
-        self.node.validated_nonce[sender_id] = tx_contents["nonce"] + 1
+        self.node.hard_nonce[sender_id] = tx_contents["nonce"] + 1
 
         # BCCs and transaction list updates
-        self.node.val_bcc[sender_id] -= transaction_cost
+        self.node.hard_bcc[sender_id] -= transaction_cost
 
         if tx_contents["type"] == TransactionType.STAKE.value:
-            self.node.validated_stakes[sender_id] = tx_contents["amount"]
+            self.node.hard_stakes[sender_id] = tx_contents["amount"]
         elif tx_contents["type"] == TransactionType.AMOUNT.value:
-            self.node.val_bcc[recv_id] += tx_contents["amount"]
+            self.node.hard_bcc[recv_id] += tx_contents["amount"]
 
         return True, ""
 
@@ -143,7 +144,6 @@ class NodeController:
         if tx["hash"] not in self.node.pending_tx:
             self.node.transactions.append(tx)
         else:
-            # print("[PENDING TX] will not add {} -- WAS IN PENDING TX LIST".format(tx["hash"]))
             self.node.pending_tx.remove(tx["hash"])
 
         self.node.lock.release()
@@ -154,9 +154,10 @@ class NodeController:
         Endpoint hit by the bootstrap node, who sends the final list of nodes to all participating nodes.
         """
         self.node.lock.acquire()
-        # Updating node list
+        
+        # Received final node list. Soft and hard BCC are initialized to zero.
         self.node.all_nodes = NodeListRequest.from_request_to_node_info_dict(request.json)
-        self.node.val_bcc = {node_id: node_info.bcc for node_id, node_info in self.node.all_nodes.items()}
+        self.node.hard_bcc = {node_id: 0 for node_id in self.node.all_nodes.keys()}
         self.node.my_info = self.node.all_nodes[self.node.id]
         logging.info(f"[Bootstrap Phase] Received NodeInfo for {len(request.json)} nodes.")
 
@@ -165,11 +166,11 @@ class NodeController:
 
         for k in self.node.all_nodes.keys():
             if k == Constants.BOOTSTRAP_ID:
-                self.node.expected_nonce[k] = 1
-                self.node.validated_nonce[k] = 1
+                self.node.soft_nonce[k] = 1
+                self.node.hard_nonce[k] = 1
             else:
-                self.node.expected_nonce[k] = 0
-                self.node.validated_nonce[k] = 0
+                self.node.soft_nonce[k] = 0
+                self.node.hard_nonce[k] = 0
 
         self.node.lock.release()
         # No need for response body. Responding with status 200.
@@ -180,21 +181,23 @@ class NodeController:
         Endpoint hit by the bootstrap node, who sends the blockchain after bootstrap phase is complete.
         """
         self.node.lock.acquire()
+
         self.node.blockchain.blocks = BlockchainRequest.from_request_to_blocks(request.json)
-        print("[Bootstrap Phase] Blockchain has been updated successfully.")
+        init_bcc = self.node.blockchain.blocks[0].transactions[0]["contents"]["amount"]
+        # Initialize soft and hard states of bootstrap's bcc with the amount
+        # given to it by the genesis transaction.
+        self.node.all_nodes[Constants.BOOTSTRAP_ID].bcc += init_bcc
+        self.node.hard_bcc[Constants.BOOTSTRAP_ID] += init_bcc
+
+        logging.info("[Bootstrap Phase] Blockchain has been updated successfully.")
         self.node.lock.release()
 
         return '', 200
 
     def process_block(self, b):
-
         idx = b.idx - 1
 
-        print("[PROCESS BLOCK with idx {} VAL = {} EXP_VAL = {}]".format(
-            b.idx,
-            b.validator[100:110],
-            self.node.next_validator(idx)[100:110]
-            ))
+        logging.info(f"[PROCESS BLOCK] idx: {b.idx}")
         
         if not b.validate(self.node.next_validator(idx), self.node.blockchain.blocks[idx].block_hash):
             return
@@ -208,15 +211,14 @@ class NodeController:
 
 
         val_id = self.node.get_node_id_by_public_key(b.validator)
-        self.node.val_bcc[val_id] += b.fees()
+        self.node.hard_bcc[val_id] += b.fees()
         
         # If the block contains a tx that this node hasn't received, add its
         # hash to the pending_tx list.
         block_tx_hashes = [tx["hash"] for tx in b.transactions]
         node_tx_hashes = [tx["hash"] for tx in self.node.transactions]
-        diff = [i for i in block_tx_hashes if i not in node_tx_hashes]
 
-        for tx_hash in diff:
+        for tx_hash in [i for i in block_tx_hashes if i not in node_tx_hashes]:
             self.node.pending_tx.add(tx_hash)
 
         # print("Block TX")
@@ -229,24 +231,14 @@ class NodeController:
         # for i in diff:
         #     print(i)
 
-        # print("[RECV BLOCK] PENDING TX LEN {}".format(len(self.node.pending_tx)))
-
         # Remove txs included in the block from this node's list
-        prev = len(self.node.transactions)
         self.node.transactions = [i for i in self.node.transactions if i not in b.transactions]
-        after = len(self.node.transactions)
-
-        # print("[RECV BLOCK] TX LEN BEFORE: {} AFTER: {}".format(prev, after))
-        # print("\nMy TX AFTER")
-        # for i in self.node.transactions:
-        #     print(i["hash"])
-
 
         # Reset soft state to current hard state
-        for k in self.node.val_bcc.keys():
-            self.node.all_nodes[k].bcc = self.node.val_bcc[k]            
-            self.node.expected_nonce[k] = self.node.validated_nonce[k]
-            self.node.stakes[k] = self.node.validated_stakes[k]
+        for k in self.node.hard_bcc.keys():
+            self.node.all_nodes[k].bcc = self.node.hard_bcc[k]            
+            self.node.soft_nonce[k] = self.node.hard_nonce[k]
+            self.node.soft_stakes[k] = self.node.hard_stakes[k]
 
         # Re-apply received transactions to soft state
         for tx in self.node.transactions:
@@ -256,11 +248,7 @@ class NodeController:
 
         self.node.blockchain.add(b)
 
-        for i in range(Constants.MAX_NODES):
-            print("{:<2d} {:<7.2f} {:<7.2f}".format(i, self.node.all_nodes[i].bcc, self.node.val_bcc[i]))
-
-        print(f"\n[PROCESS BLOCK with idx {b.idx} DONE]")
-
+        logging.info(f"[PROCESS BLOCK] idx: {b.idx} DONE")
 
     def receive_block(self):
         """
@@ -287,8 +275,8 @@ class NodeController:
 
 class BootstrapController(NodeController):
 
-    def __init__(self):
-        self.node = Bootstrap()
+    def __init__(self, read_file=True):
+        self.node = Bootstrap(read_file=read_file)
         self.blueprint = Blueprint("nodes", __name__)
         self.nodes_counter = 1
         self.is_bootstrapping_phase_over = False
@@ -297,6 +285,7 @@ class BootstrapController(NodeController):
         self.blueprint.add_url_rule("/nodes", "nodes", self.add_node, methods=["POST"])
         self.blueprint.add_url_rule("/transactions", "transactions", self.receive_transaction, methods=["POST"])
         self.blueprint.add_url_rule("/blocks", "blocks", self.receive_block, methods=["POST"])
+        self.read_file = read_file
 
     def after_request(self, response):
         self.node.lock.acquire()
@@ -309,7 +298,8 @@ class BootstrapController(NodeController):
                 self.node.broadcast_blockchain()
                 self.node.initialize_stakes()
                 self.node.perform_initial_transactions()
-                self.node.execute_file_transactions()
+                if self.read_file:
+                    self.node.execute_file_transactions()
 
         self.node.lock.release()
         return response
@@ -341,9 +331,9 @@ class BootstrapController(NodeController):
             join_request.port,
             join_request.public_key
         )
-        self.node.val_bcc[self.nodes_counter] = 0
-        self.node.expected_nonce[self.nodes_counter] = 0
-        self.node.validated_nonce[self.nodes_counter] = 0
+        self.node.hard_bcc[self.nodes_counter] = 0
+        self.node.soft_nonce[self.nodes_counter] = 0
+        self.node.hard_nonce[self.nodes_counter] = 0
         logging.info(f"Node with id {self.nodes_counter} has been added to the network.")
 
         # Creating response

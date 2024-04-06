@@ -10,11 +10,14 @@ from transaction import TransactionType
 
 
 class Bootstrap(Node):
-    def __init__(self):
-        super().__init__(Constants.BOOTSTRAP_IP_ADDRESS,
-                         Constants.BOOTSTRAP_PORT,
-                         Constants.BOOTSTRAP_ID,
-                         Constants.BOOTSTRAP_PRIVKEY_PATH)
+    def __init__(self, read_file=True):
+        super().__init__(
+            Constants.BOOTSTRAP_IP_ADDRESS,
+            Constants.BOOTSTRAP_PORT,
+            Constants.BOOTSTRAP_ID,
+            Constants.BOOTSTRAP_PRIVKEY_PATH,
+            read_file=read_file
+        )
         self.my_info = NodeInfo(
             Constants.BOOTSTRAP_IP_ADDRESS,
             Constants.BOOTSTRAP_PORT,
@@ -35,9 +38,9 @@ class Bootstrap(Node):
         
         self.blockchain.add(genesis_block)
         self.my_info.bcc = Constants.STARTING_BCC_PER_NODE * Constants.MAX_NODES
-        self.val_bcc[self.id] = Constants.STARTING_BCC_PER_NODE * Constants.MAX_NODES
-        self.expected_nonce[self.id] = 1
-        self.validated_nonce[self.id] = 1
+        self.hard_bcc[self.id] = Constants.STARTING_BCC_PER_NODE * Constants.MAX_NODES
+        self.soft_nonce[self.id] = 1
+        self.hard_nonce[self.id] = 1
 
         print("Bootstrap bcc: {}".format(self.my_info.bcc))
 
@@ -79,7 +82,7 @@ class Bootstrap(Node):
             self.transactions.append(tx)
             node.bcc += transfer_amount
             self.my_info.bcc -= transfer_amount * Constants.TRANSFER_FEE_MULTIPLIER
-            self.expected_nonce[self.id] += 1
+            self.soft_nonce[self.id] += 1
             print("Bootstrap bcc: {}".format(self.my_info.bcc))
             self.broadcast_request(tx, "/transactions")
 

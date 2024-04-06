@@ -16,15 +16,19 @@ def user_interface(node, prompt_str=">>> "):
         print("")
 
 app = Flask(__name__)
-logging.basicConfig(level=logging.WARNING)
+logging.basicConfig(level=logging.INFO)
 log = logging.getLogger('werkzeug')
 log.setLevel(logging.WARNING)
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-b", "--bootstrap", action = argparse.BooleanOptionalAction, default = False)
 parser.add_argument("-p", "--port", nargs = "?", const = "8000", default = "8000")
+parser.add_argument("-o", "--okeanos", action = argparse.BooleanOptionalAction, default = False)
+parser.add_argument("-f", "--file", action = argparse.BooleanOptionalAction, default = True)
 args = parser.parse_args()
-# args.bootstrap = True if args.port == '5000' else False
+
+if args.okeanos:
+    Constants.BOOTSTRAP_IP_ADDRESS = "192.168.0.1"
 
 print("-----------------------------------------------------------")
 print("""
@@ -38,7 +42,7 @@ print("""
 print("-----------------------------------------------------------")
 
 try:
-    controller = BootstrapController() if args.bootstrap else NodeController(myIP(), args.port)
+    controller = BootstrapController(args.file) if args.bootstrap else NodeController(myIP(), args.port, args.file)
 except BootstrapConnError as e:
     logging.error(e)
     sys.exit(-1)
@@ -48,6 +52,7 @@ print("\nMy pubkey: ...{}...\n".format(controller.node.public_key[100:110]))
 # Add routes / endpoints.
 app.register_blueprint(controller.blueprint, url_prefix='/')
 app.after_request(controller.after_request)
-app.run(host="0.0.0.0", port=Constants.BOOTSTRAP_PORT if args.bootstrap else args.port)
 t = Thread(target=user_interface, args=[controller.node, ""])
 t.start()
+app.run(host="0.0.0.0", port=Constants.BOOTSTRAP_PORT if args.bootstrap else args.port)
+

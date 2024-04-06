@@ -8,8 +8,7 @@ from functools import reduce
 from random import randint
 from threading import Thread, Lock
 
-import helper
-from helper import tx_str
+from helper import tx_str, url_str, read_transaction_file, BootstrapConnError
 from block import Block
 from blockchain import Blockchain
 from constants import Constants
@@ -28,27 +27,18 @@ class NodeInfo:
         self.public_key = public_key
         self.bcc = bcc
 
-    def get_node_url(self):
-        url = f"http://{self.ip_address}:{self.port}"
-        return url
-
 
 class Node:
-    def __init__(self, ip_address, port, node_id=None, path=None):
+    def __init__(self, ip_address, port, node_id=None, path=None, read_file=True):
         self.wallet = Wallet(path)
         self.tx_builder = TransactionBuilder(self.wallet)
         self.public_key = self.wallet.public_key
         self.my_info = None
         self.all_nodes: dict[int, NodeInfo] = {}
         self.pending_tx = set()
-        self.val_bcc = {}
+        self.hard_bcc = {}
         self.pending_blocks = {}
         
-        # Move this where the genesis block is received!!
-        if node_id is None:
-            self.val_bcc = {i : 0 for i in range(1, Constants.MAX_NODES)}
-            self.val_bcc[0] = Constants.STARTING_BCC_PER_NODE * Constants.MAX_NODES
-
         # Only the bootstrap node creates a Node object with known id
         if node_id is None:
             self.join_network(ip_address, port, self.public_key)  # TODO: Maybe move this in Controller?
@@ -56,25 +46,25 @@ class Node:
             self.id = node_id
         
         self.transactions = []
-        self.stakes = {}
-        self.validated_stakes = {}
-        self.expected_nonce = {}
-        self.validated_nonce = {}
+        self.soft_stakes = {}
+        self.hard_stakes = {}
+        self.soft_nonce = {}
+        self.hard_nonce = {}
 
         self.blockchain = Blockchain()
         # Keep a list of which node (by id) validated each block for testing
         self.validators = []
-        self.done = False
         self.lock = Lock()
         self.mint_broadcast_lock = Lock()
         thr = Thread(target=self.poll_capacity)
         thr.start()
-        thr2 = Thread(target=self.poll_done)
-        thr2.start()
+        if read_file:
+            thr2 = Thread(target=self.poll_done)
+            thr2.start()
  
     def poll_capacity(self):
         # Do not start minting until all nodes have received their BCCs.
-        while self.expected_nonce.get(Constants.BOOTSTRAP_ID) is None or self.expected_nonce.get(Constants.BOOTSTRAP_ID) < Constants.MAX_NODES:
+        while self.soft_nonce.get(Constants.BOOTSTRAP_ID) is None or self.soft_nonce.get(Constants.BOOTSTRAP_ID) < Constants.MAX_NODES:
             time.sleep(1)
         time.sleep(1)
         blocks_competed_for = 1
@@ -89,22 +79,33 @@ class Node:
                 time.sleep(0)
 
     def poll_done(self):
+        """
+        Thread function that polls the length of the blockchain every 3 seconds.
+        When it stops growing, assume that the message passing is finished and
+        dump logs.
+        """
+        # Wait until all nodes have connected to the network
+        while len(self.all_nodes) != Constants.MAX_NODES:
+            time.sleep(1)
+        
+        last_len = 0
         while True:
-            if self.done:
-                time.sleep(10)
-                print("Dumping logs")
+            cur_len = len(self.blockchain)
+            if cur_len == last_len:
+                print("!!! DUMPING LOGS !!!")
                 self.dump_logs()
                 break
             else:
-                time.sleep(0)
+                last_len = cur_len
+                time.sleep(3)
 
     def initialize_stakes(self):
         for node_id, node_info in self.all_nodes.items():
-            self.stakes[node_id] = Constants.INITIAL_STAKE
-            self.validated_stakes[node_id] = Constants.INITIAL_STAKE
+            self.soft_stakes[node_id] = Constants.INITIAL_STAKE
+            self.hard_stakes[node_id] = Constants.INITIAL_STAKE
             self.all_nodes[node_id].bcc -= Constants.INITIAL_STAKE
-            self.val_bcc[node_id] -= Constants.INITIAL_STAKE
-        return self.stakes
+            self.hard_bcc[node_id] -= Constants.INITIAL_STAKE
+        return self.soft_stakes
 
     def get_node_info_by_public_key(self, public_key):
         for node_info in self.all_nodes.values():
@@ -129,19 +130,19 @@ class Node:
 
         try:
             join_response = requests.post(
-                Constants.BOOTSTRAP_URL + "/nodes",
+                url_str(Constants.BOOTSTRAP_IP_ADDRESS, Constants.BOOTSTRAP_PORT) + "/nodes",
                 json=join_request.to_dict(),
                 headers=Constants.JSON_HEADER,
             )
         except requests.exceptions.ConnectionError:
-            raise helper.BootstrapConnError("Connection to bootstrap node failed -- is it running?")
+            raise BootstrapConnError("Connection to bootstrap node failed -- is it running?")
 
         if join_response.ok:
             response = JoinResponse.from_json(join_response.json())
             self.id = response.id
-            logging.info(f"Joined the network successfully with id {self.id}. Waiting for bootstrap phase completion.")
+            print(f"Joined the network successfully with id {self.id}. Waiting for bootstrap phase completion.")
         else:
-            raise helper.BootstrapConnError(join_response.text)
+            raise BootstrapConnError(join_response.text)
 
     def broadcast_request(self, request_body, endpoint):
         for node_id, node in self.all_nodes.items():
@@ -152,7 +153,7 @@ class Node:
             # if endpoint == "/blocks":
                 # print(f"Sending block to {node_id}")
 
-            response = requests.post(node.get_node_url() + endpoint,
+            response = requests.post(url_str(node.ip_address, node.port) + endpoint,
                                      json=request_body,
                                      headers=Constants.JSON_HEADER)
 
@@ -171,7 +172,7 @@ class Node:
         prev_block = self.blockchain.blocks[idx]
 
         nodes = [i for i in range(Constants.MAX_NODES)]
-        stakes = [self.validated_stakes[i] for i in nodes]
+        stakes = [self.hard_stakes[i] for i in nodes]
 
         total_stake = sum(stakes)
 
@@ -205,20 +206,26 @@ class Node:
             case TransactionType.AMOUNT.value:
                 transaction_cost = payload * Constants.TRANSFER_FEE_MULTIPLIER
             case TransactionType.STAKE.value:
-                transaction_cost = payload - self.stakes[self.id]
+                transaction_cost = payload - self.soft_stakes[self.id]
             case _:
                 print("Invalid transaction type.")
                 return
 
         self.lock.acquire()
         self.mint_broadcast_lock.acquire()
-        print(f"[CREATE TX] Cost: {transaction_cost} My balance: {self.my_info.bcc} {self.all_nodes[self.id].bcc} My val balance: {self.val_bcc[self.id]}")
+        my_tx += 1
+        logging.info("[CREATE TX {}] Cost: {} My balance: {} My val balance: {}".format(
+            my_tx,
+            transaction_cost,
+            self.my_info.bcc,
+            self.hard_bcc[self.id]
+        ))
 
         if transaction_cost > self.my_info.bcc:
             self.lock.release()
             self.mint_broadcast_lock.release()
             logging.warn(f"My Transaction cannot proceed as the node does not have the required BCCs.")
-            time.sleep(5)
+            # time.sleep(5)
             return
 
         # Balance updates
@@ -227,12 +234,11 @@ class Node:
             recv_id = self.get_node_id_by_public_key(recv)
             self.all_nodes[recv_id].bcc += payload
         elif type == TransactionType.STAKE.value:
-            self.stakes[self.id] = payload
+            self.soft_stakes[self.id] = payload
 
         tx_request = self.tx_builder.create(recv, type, payload)
 
-        my_tx += 1
-        print("[CREATE TX {}] {}".format(my_tx, tx_request["hash"]))
+        logging.info("[CREATE TX {}] Hash: {}".format(my_tx, tx_request["hash"]))
 
         self.transactions.append(tx_request)
         # print("\nMY TX HASHES:")
@@ -263,23 +269,23 @@ class Node:
         b = Block(prev_block.idx+1, time.time(), block_txs, self.public_key, prev_block.block_hash)
         b.set_hash()
 
-        print("[MINT BLOCK with idx {} VAL = {}]".format(prev_block.idx+1, self.id))
+        logging.info(f"[MINT BLOCK] idx: {prev_block.idx+1}")
 
         # Update the amount of validated BCCs for each node.
         for tx in block_txs:
             sender_id = self.get_node_id_by_public_key(tx["contents"]["sender_addr"])
-            self.val_bcc[sender_id] -= tx_cost(tx["contents"], self.validated_stakes[sender_id])
+            self.hard_bcc[sender_id] -= tx_cost(tx["contents"], self.hard_stakes[sender_id])
 
             if tx["contents"]["type"] == TransactionType.STAKE.value:
-                self.validated_stakes[sender_id] = tx["contents"]["amount"]
+                self.hard_stakes[sender_id] = tx["contents"]["amount"]
             if tx["contents"]["type"] == TransactionType.AMOUNT.value:
                 recv_pubkey = tx["contents"]["recv_addr"]
                 recv_id = self.get_node_id_by_public_key(recv_pubkey)
-                self.val_bcc[recv_id] += tx["contents"]["amount"]
+                self.hard_bcc[recv_id] += tx["contents"]["amount"]
 
         # print("As the validator, I won {:.2f} in fees. Sending block...".format(b.fees()))
         self.my_info.bcc += b.fees()
-        self.val_bcc[self.id] += b.fees()
+        self.hard_bcc[self.id] += b.fees()
 
         block_request = BlockRequest.from_block_to_request(b)
         self.blockchain.add(b)
@@ -313,7 +319,7 @@ class Node:
 
 
     def execute_file_transactions(self):
-        receivers, messages = helper.read_transaction_file(self.id)
+        receivers, messages = read_transaction_file(self.id)
         # receivers, messages = self.read_simple_transaction_file()
         for receiver, message in zip(receivers, messages):
             # time.sleep(0.1 + random.random())
@@ -322,13 +328,12 @@ class Node:
                 continue
 
             self.create_tx(self.all_nodes[receiver].public_key, TransactionType.MESSAGE.value, message[:-1])
-        self.done = True
-
 
     def dump_logs(self):
         # Create log directory if it doesn't exist
-        if not os.path.exists("logs"):
-            os.mkdir("logs")
+        log_path = os.path.join(Constants.SRC_PATH, "logs")
+        if not os.path.exists(log_path):
+            os.mkdir(log_path)
 
         # fname = "validators" + str(self.id) + ".txt"
         # fpath = path.join(".", "logs", fname)
@@ -337,12 +342,12 @@ class Node:
         #         f.write(str(v) + "\n")
         
         fname = "blockchain" + str(self.id) + ".txt"
-        fpath = os.path.join("logs", fname)
+        fpath = os.path.join(log_path, fname)
         with open(fpath, "w") as f:
-            f.write(self.blockchain.to_str(indent=0) + "\n")
+            f.write(self.blockchain.to_str())
 
         fname = "balance" + str(self.id) + ".txt"
-        fpath = os.path.join("logs", fname)
+        fpath = os.path.join(log_path, fname)
         with open(fpath, "w") as f:
             f.write(self.balance(add_mark=False))  
 
@@ -370,23 +375,23 @@ class Node:
         total = []
         for i in range(Constants.MAX_NODES):
             c = "(*)" if add_mark and i == self.id else "   "
-            total.append(self.all_nodes[i].bcc + self.stakes[i])
+            total.append(self.all_nodes[i].bcc + self.soft_stakes[i])
             s += "{:<3d}{} {:<7.2f}   {:<7.2f} {:<7.2f} {:<14.2f} {:<9.2f}\n".format(
                 i,
                 c,
                 self.all_nodes[i].bcc,
-                self.stakes[i],
+                self.soft_stakes[i],
                 total[i],
-                self.val_bcc[i],
-                self.validated_stakes[i]
+                self.hard_bcc[i],
+                self.hard_stakes[i]
             )
         s += "------------------------------------------------------------>(+)\n"
         s += "Total  {:<7.2f}   {:<7.2f} {:<7.2f} {:<14.2f} {:<9.2f}\n".format(
             reduce(lambda x,y: x+y, map(lambda d: d.bcc, self.all_nodes.values())),
-            reduce(lambda x,y: x+y, self.stakes.values()),
+            reduce(lambda x,y: x+y, self.soft_stakes.values()),
             sum(total),
-            reduce(lambda x,y: x+y, self.val_bcc.values()),
-            reduce(lambda x,y: x+y, self.validated_stakes.values())
+            reduce(lambda x,y: x+y, self.hard_bcc.values()),
+            reduce(lambda x,y: x+y, self.hard_stakes.values())
         )
         s += "Next val. will earn:     {:<7.2f}\n".format(self.waiting_tx_fees())
         s += "Total circulating BCCs:  {:<7.2f}\n".format(sum(total) + self.waiting_tx_fees())
@@ -417,21 +422,16 @@ class Node:
                     s = self.blockchain.to_str() 
                 else:
                     s = self.view_block()
-                print(s)
+                print(s, end="")
                 # print("validators: {}".format(self.validators))
             case "tx":
                 len_sum = 0
-                tabs = 1 * "\t"
-
-                s = tabs + f"transactions: [\n"
+                s = "transactions:\n"
 
                 for i, tx in enumerate(self.transactions):
-                    s += tx_str(tx, True, 2)
-                    if i != len(self.transactions) - 1:
-                        s += "\n"
+                    s += tx_str(tx, True)
                     if tx["contents"]["type"] == TransactionType.MESSAGE.value:
                         len_sum += len(tx["contents"]["message"])
-                s += tabs + "]"
                 print(s)
                 print(f"Sum of lengths of messages = {len_sum}")
                 print(f"TX List length = {len(self.transactions)}")

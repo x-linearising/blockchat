@@ -1,3 +1,4 @@
+import os
 import json
 import struct
 from socket import gethostname, gethostbyname
@@ -28,6 +29,9 @@ def myIP():
     # 127.0.0.1 is their IP
     return gethostbyname(gethostname())
 
+def url_str(ip, port):
+    return f"http://{ip}:{port}"
+
 def read_pubkey(path):
     with open(path, "rb") as f:
         k = load_ssh_public_key(f.read()) \
@@ -52,33 +56,36 @@ def hash_dict(d: dict) -> bytes:
     d_hash = sha256hash(d_bytes)
     return d_hash
 
-def tx_str(tx, summarized=True, indent=1):
+def tx_str(tx, summarized=True, spaces=0):
     """
     Pretty prints a transaction tx, represented as a dict, with indent leading tabs.
     If summarized is set, prints the characters at indexes 100 to 110 for strings
     that are expected to be multi-line (signatures, public keys)
     """
-    tabs = indent * "\t"
-    s = tabs + "hash: {}\n".format(tx["hash"])
+    indent = spaces * " "
+    s = indent + "- hash: {}\n".format(tx["hash"])
     if summarized:
-        s += tabs + "sign: ...{}...\n".format(tx["sign"][100:110]) 
-        s += tabs + "sender_addr: ...{}...\n".format(tx["contents"]["sender_addr"][100:110])
-        s += tabs + "recv_addr: ...{}...\n".format(tx["contents"]["recv_addr"][100:110])
+        s += indent + "  sign: ...{}...\n".format(tx["sign"][100:110]) 
+        s += indent + "  sender_addr: ...{}...\n".format(tx["contents"]["sender_addr"][100:110])
+        s += indent + "  recv_addr: ...{}...\n".format(tx["contents"]["recv_addr"][100:110])
     else:   
-        s += tabs + "sign: {}\n".format(tx["sign"])
-        s += tabs + "sender_addr: {}\n".format(tx["contents"]["sender_addr"])
-        s += tabs + "recv_addr: {}\n".format(tx["contents"]["recv_addr"])
+        s += indent + "  sign: {}\n".format(tx["sign"])
+        s += indent + "  sender_addr: {}\n".format(tx["contents"]["sender_addr"])
+        s += indent + "  recv_addr: {}\n".format(tx["contents"]["recv_addr"])
     
-    s += tabs + "type: {}\n".format(tx["contents"]["type"])
-    s += tabs + "amount: {}\n".format(tx["contents"]["amount"])
-    s += tabs + "message: {}\n".format(tx["contents"]["message"])
-    s += tabs + "nonce: {}\n".format(tx["contents"]["nonce"])
+    s += indent + "  type: {}\n".format(tx["contents"]["type"])
+    s += indent + "  amount: {}\n".format(tx["contents"]["amount"])
+    s += indent + "  message: {}\n".format(tx["contents"]["message"])
+    s += indent + "  nonce: {}".format(tx["contents"]["nonce"])
     return s
 
 def read_transaction_file(node_id):
     receivers = []
     messages = []
-    with open(f"input/trans{node_id}.txt", 'r') as file:
+    src_path = os.path.dirname(os.path.abspath(__file__))
+    fname = f"trans{node_id}.txt"
+    fpath = os.path.join(src_path, "input", fname)
+    with open(fpath, 'r') as file:
         lines = file.readlines()
 
         for line in lines:
