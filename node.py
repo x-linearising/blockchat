@@ -91,7 +91,7 @@ class Node:
         last_len = 0
         while True:
             cur_len = len(self.blockchain)
-            if cur_len == last_len:
+            if cur_len == last_len and cur_len != 0:
                 print("!!! DUMPING LOGS !!!")
                 self.dump_logs()
                 break

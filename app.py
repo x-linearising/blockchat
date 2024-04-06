@@ -8,6 +8,9 @@ from controllers.controller import BootstrapController, NodeController
 from constants import Constants
 from helper import myIP, BootstrapConnError
 
+def start_app(app, args):
+    app.run(host="0.0.0.0", port=Constants.BOOTSTRAP_PORT if args.bootstrap else args.port)
+
 def user_interface(node, prompt_str=">>> "):
     while True:
         print(f"[Node {node.id}] Enter your command:")
@@ -29,6 +32,9 @@ args = parser.parse_args()
 
 if args.okeanos:
     Constants.BOOTSTRAP_IP_ADDRESS = "192.168.0.1"
+
+app_thread = Thread(target=start_app, args=[app, args])
+app_thread.start()
 
 print("-----------------------------------------------------------")
 print("""
@@ -54,5 +60,4 @@ app.register_blueprint(controller.blueprint, url_prefix='/')
 app.after_request(controller.after_request)
 t = Thread(target=user_interface, args=[controller.node, ""])
 t.start()
-app.run(host="0.0.0.0", port=Constants.BOOTSTRAP_PORT if args.bootstrap else args.port)
 
