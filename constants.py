@@ -13,7 +13,7 @@ class Constants:
 
     MAX_NODES = 10
     JSON_HEADER = {'Content-Type': 'application/json'}
-    CAPACITY = 10
+    CAPACITY = 20
     STARTING_BCC_PER_NODE = 1000
     TRANSFER_FEE_MULTIPLIER = 1.03
     INITIAL_STAKE = 10
