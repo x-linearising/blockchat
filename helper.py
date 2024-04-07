@@ -24,9 +24,6 @@ class BootstrapConnError(Exception):
         self.msg = msg
 
 def myIP():
-    # TODO: this may return 127.0.0.1 on some machines instead of the local IP addr.
-    # no problem when running locally, but we don't want our online nodes to believe
-    # 127.0.0.1 is their IP
     return gethostbyname(gethostname())
 
 def url_str(ip, port):

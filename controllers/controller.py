@@ -13,6 +13,7 @@ from response_classes.join_response import JoinResponse
 from constants import Constants
 from transaction import TransactionType, verify_tx, tx_cost 
 
+# How many transactions has this node receieved
 recv_tx = 0
 
 class NodeController:
@@ -37,18 +38,18 @@ class NodeController:
         @response.call_on_close
         def process_after_request():
             global recv_tx
-            if request_path == '/blockchain':
-                pass
-            elif request_path == '/transactions':
+            if request_path == '/transactions':
                 recv_tx += 1
                 if self.read_file and recv_tx == Constants.MAX_NODES - 1:
                     print("Received initial BCCs, BROADCASTING FILE TXs")
                     self.node.execute_file_transactions()
-
         return response
 
 
     def process_soft_tx(self, tx, soft=True):
+        """
+        Read a transaction and change this node's soft state accordingly
+        """
         tx_contents = tx["contents"]
 
         sender_public_key = tx_contents["sender_addr"]
@@ -89,6 +90,9 @@ class NodeController:
 
 
     def process_hard_tx(self, tx):
+        """
+        Read a transaction and change this node's hard state accordingly
+        """
         tx_contents = tx["contents"]
 
         sender_public_key = tx_contents["sender_addr"]
@@ -165,6 +169,7 @@ class NodeController:
         self.node.initialize_stakes()
 
         for k in self.node.all_nodes.keys():
+            # bootstrap has already created the genesis transaction
             if k == Constants.BOOTSTRAP_ID:
                 self.node.soft_nonce[k] = 1
                 self.node.hard_nonce[k] = 1
@@ -195,6 +200,9 @@ class NodeController:
         return '', 200
 
     def process_block(self, b):
+        """
+        Read a block, make sure it's valid, change soft and hard state accordingly
+        """
         idx = b.idx - 1
 
         logging.info(f"[PROCESS BLOCK] idx: {b.idx}")
@@ -220,16 +228,6 @@ class NodeController:
 
         for tx_hash in [i for i in block_tx_hashes if i not in node_tx_hashes]:
             self.node.pending_tx.add(tx_hash)
-
-        # print("Block TX")
-        # for i in b.transactions:
-        #     print(i["hash"])
-        # print("\nMy TX BEFORE")
-        # for i in self.node.transactions:
-        #     print(i["hash"])
-        # print("\nDIFF")
-        # for i in diff:
-        #     print(i)
 
         # Remove txs included in the block from this node's list
         self.node.transactions = [i for i in self.node.transactions if i not in b.transactions]

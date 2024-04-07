@@ -1,7 +1,6 @@
 import logging
 import time
 from base64 import b64encode
-import PoS
 import wallet
 from constants import Constants
 from helper import tx_str, hash_dict, sha256hash

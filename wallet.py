@@ -47,16 +47,3 @@ class Wallet:
             return True
         except InvalidSignature:
             return False
-
-
-if __name__ == "__main__":
-    # Simple test: load private key from file, sign a message with it,
-    # verify that the signature is valid
-    # test_msg = b"test input"
-    # w = Wallet(path.join(".", "bootstrap_keys", "id_rsa"))
-    # sign = w.sign(test_msg)
-    # if w.verify(sign, test_msg):
-    #     print("Signature was verified.")
-    # else:
-    #     print("[Error] Signature was not verified!")
-    read_pubkey("./bootstrap_keys/id_rsa.pub")

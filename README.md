@@ -2,6 +2,7 @@
 Semester project for Distributed Systems course.
 
 ## How to run
+Install required libraries: `pip install -r requirements.txt`.
 Execute app.py from command line providing the proper arguments.
 Make sure to run a boostrap node instance first.  
 

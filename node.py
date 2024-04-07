@@ -18,6 +18,7 @@ from response_classes.join_response import JoinResponse
 from wallet import Wallet
 from transaction import TransactionBuilder, TransactionType, tx_cost
 
+# How many transactions has this node sent
 my_tx = 0
 
 class NodeInfo:
@@ -35,13 +36,19 @@ class Node:
         self.public_key = self.wallet.public_key
         self.my_info = None
         self.all_nodes: dict[int, NodeInfo] = {}
-        self.pending_tx = set()
         self.hard_bcc = {}
+        # Transactions that this node received in a validated block,
+        # but hasn't received from the original sender yet.
+        self.pending_tx = set()
+        # Blocks that were received when we were not expecting them
+        # (e.g getting block with idx i+2 before the one with idx i+1)
+        # Save them and validate them after this node finally receives
+        # the correct block (with idx i+1)
         self.pending_blocks = {}
         
         # Only the bootstrap node creates a Node object with known id
         if node_id is None:
-            self.join_network(ip_address, port, self.public_key)  # TODO: Maybe move this in Controller?
+            self.join_network(ip_address, port, self.public_key)
         else:
             self.id = node_id
         
@@ -52,8 +59,6 @@ class Node:
         self.hard_nonce = {}
 
         self.blockchain = Blockchain()
-        # Keep a list of which node (by id) validated each block for testing
-        self.validators = []
         self.lock = Lock()
         self.mint_broadcast_lock = Lock()
         thr = Thread(target=self.poll_capacity)
@@ -63,8 +68,13 @@ class Node:
             thr2.start()
  
     def poll_capacity(self):
+        """
+        Thread function that mints the next block, when this node is the next
+        validator and has received enough transactions
+        """
         # Do not start minting until all nodes have received their BCCs.
-        while self.soft_nonce.get(Constants.BOOTSTRAP_ID) is None or self.soft_nonce.get(Constants.BOOTSTRAP_ID) < Constants.MAX_NODES:
+        while (self.soft_nonce.get(Constants.BOOTSTRAP_ID) is None) \
+            or (self.soft_nonce.get(Constants.BOOTSTRAP_ID) < Constants.MAX_NODES):
             time.sleep(1)
         time.sleep(1)
         blocks_competed_for = 1
@@ -123,7 +133,6 @@ class Node:
         Makes a request to the boostrap node in order to join the network.
         If the join is successful, the node is assigned an id.
         """
-
         logging.info("Sending request to Boostrap Node to join the network.")
 
         # Make request to boostrap node
@@ -151,25 +160,21 @@ class Node:
             if node_id == self.id:
                 continue
 
-            # if endpoint == "/blocks":
-                # print(f"Sending block to {node_id}")
-
             response = requests.post(url_str(node.ip_address, node.port) + endpoint,
                                      json=request_body,
                                      headers=Constants.JSON_HEADER)
 
-            if response.ok:
-                # logging.info(f"Request to node {node_id} was successful with status code: {response.status_code}.")
-                pass
-            else:
-                # TODO: Handle this?
+            if not response.ok:
                 logging.warning(f"REQ TO {node_id} FAILED: [{response.status_code}]: {response.reason}.")
-                # sys.exit()  # TODO: This is causing trouble. Transaction file reading stops here.
 
     def is_next_validator(self, idx=-1):
         return self.next_validator(idx) == self.public_key
 
     def next_validator(self, idx=-1):
+        """
+        Function that runs the Proof of Stake algorithm and returns the next
+        validator's public key
+        """
         prev_block = self.blockchain.blocks[idx]
 
         nodes = [i for i in range(Constants.MAX_NODES)]
@@ -182,11 +187,16 @@ class Node:
         random.seed(prev_block.block_hash)
         i = random.choices(nodes, weights=weights, k=1)[0]
         
-        self.validators.append(i)
         return self.all_nodes[i].public_key
 
 
     def create_tx(self, recv, type, payload):
+        """
+        Function that creates and broadcasts a transaction
+        stake transactions: recv address is 0 and payload the stake amount
+        message transactions: payload is the message string
+        amoutn transactions: payload is the amount to be sent
+        """
         global my_tx
 
         # Accept IDs instead of public keys as well.
@@ -200,7 +210,7 @@ class Node:
             print("Cannot send transaction to sender.")
             return
 
-        # Verify sufficient wallet
+        # Calculate transaction cost based on tx type
         match type:
             case TransactionType.MESSAGE.value:
                 transaction_cost = len(payload)
@@ -222,11 +232,11 @@ class Node:
             self.hard_bcc[self.id]
         ))
 
+        # Verify sufficient wallet funds
         if transaction_cost > self.my_info.bcc:
             self.lock.release()
             self.mint_broadcast_lock.release()
             logging.warn(f"My Transaction cannot proceed as the node does not have the required BCCs.")
-            # time.sleep(5)
             return
 
         # Balance updates
@@ -242,10 +252,6 @@ class Node:
         logging.info("[CREATE TX {}] Hash: {}".format(my_tx, tx_request["hash"]))
 
         self.transactions.append(tx_request)
-        # print("\nMY TX HASHES:")
-        # for tx in self.transactions:
-        #     print(tx["hash"])
-        # print("\n")
 
         self.lock.release()
         self.mint_broadcast_lock.release()
@@ -260,9 +266,6 @@ class Node:
         self.lock.acquire()
         prev_block = self.blockchain.blocks[-1]
         block_txs = self.transactions[:Constants.CAPACITY]
-        # print("[MINT BLOCK] WITH TXS:")
-        # for tx in block_txs:
-        #     print(tx["hash"])
 
         # Prune txs added to the block from this node's list
         self.transactions = self.transactions[Constants.CAPACITY:]
@@ -284,7 +287,6 @@ class Node:
                 recv_id = self.get_node_id_by_public_key(recv_pubkey)
                 self.hard_bcc[recv_id] += tx["contents"]["amount"]
 
-        # print("As the validator, I won {:.2f} in fees. Sending block...".format(b.fees()))
         self.my_info.bcc += b.fees()
         self.hard_bcc[self.id] += b.fees()
 
@@ -298,13 +300,17 @@ class Node:
         self.mint_broadcast_lock.release()
 
     def stake(self, amount):
-        self.create_tx(str(Constants.BOOTSTRAP_ID), TransactionType.STAKE.value, amount)
+        self.create_tx("0", TransactionType.STAKE.value, amount)
         print(f"Node {self.id} stakes {amount}")
 
     def view_block(self):
         return self.blockchain.blocks[-1].to_str()
 
     def read_simple_transaction_file(self):
+        """
+        For input files that contain messages in each line without specifying
+        a receiver. see input/transez.txt
+        """
         receivers = []
         messages = []
         with open("input/transez.txt", "r") as f:
@@ -320,15 +326,25 @@ class Node:
 
 
     def execute_file_transactions(self):
+        """
+        Read input/transX.txt, where X is this node's id
+        and execute its transactions
+        """
         receivers, messages = read_transaction_file(self.id)
         # receivers, messages = self.read_simple_transaction_file()
         for receiver, message in zip(receivers, messages):
-            # time.sleep(0.1 + random.random())
 
+            # If the receiver is a node that doesn't exist
+            # (e.g trying to send a message to node 8 when running the network
+            # with 5 nodes) then don't send that message
             if receiver > Constants.MAX_NODES - 1:
                 continue
 
-            self.create_tx(self.all_nodes[receiver].public_key, TransactionType.MESSAGE.value, message[:-1])
+            self.create_tx(
+                self.all_nodes[receiver].public_key,
+                TransactionType.MESSAGE.value,
+                message[:-1]
+            )
 
     def dump_logs(self):
         # Create log directory if it doesn't exist
@@ -336,12 +352,6 @@ class Node:
         if not os.path.exists(log_path):
             os.mkdir(log_path)
 
-        # fname = "validators" + str(self.id) + ".txt"
-        # fpath = path.join(".", "logs", fname)
-        # with open(fpath, "w") as f:
-        #     for v in self.validators:
-        #         f.write(str(v) + "\n")
-        
         fname = "blockchain" + str(self.id) + ".txt"
         fpath = os.path.join(log_path, fname)
         with open(fpath, "w") as f:
@@ -353,6 +363,10 @@ class Node:
             f.write(self.balance(add_mark=False))  
 
     def waiting_tx_fees(self):
+        """
+        How many fees have been paid for the transactions this node has received.
+        Eventually, some node will earn this fees (as a validator).
+        """
         fees = 0
         for tx in self.transactions:
             match tx["contents"]["type"]:
@@ -400,6 +414,9 @@ class Node:
         return s
 
     def execute_cmd(self, line: str):
+        """
+        Function that executes the CLI commands
+        """
         # lstrip to remove leading whitespace, if any
         items = line.lstrip().split(" ")
         command_name = items[0]
@@ -427,7 +444,6 @@ class Node:
                 else:
                     s = self.view_block()
                 print(s, end="")
-                # print("validators: {}".format(self.validators))
             case "tx":
                 len_sum = 0
                 s = "transactions:\n"
@@ -493,5 +509,3 @@ class Node:
                 """)
             case _:
                 print("Invalid Command! You can view valid commands with \'help\'")
-
-

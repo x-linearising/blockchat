@@ -94,7 +94,6 @@ def verify_tx(tx, expected_nonce) -> bool:
         print("[Received Transaction] Invalid signature detected!")
         return False
 
-
 def tx_cost(tx_contents, sender_stakes):
     # Transaction Cost
     match tx_contents["type"]:
