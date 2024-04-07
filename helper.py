@@ -8,9 +8,9 @@ from cryptography.hazmat.primitives.serialization import load_ssh_public_key
 
 class JSONSerializable:
     """
-        Classes inheriting this class can have their instances converted to Json.
-        This is useful in endpoints as Flask needs a dictionary like structure
-        for its responses and requests.
+    Classes inheriting this class can have their instances converted to Json.
+    This is useful in endpoints as Flask needs a dictionary like structure
+    for its responses and requests.
     """
     def to_dict(self):
         if hasattr(self, '__dict__'):

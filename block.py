@@ -68,9 +68,6 @@ class Block():
         for tx in self.transactions:
             tx_contents = tx["contents"]
 
-            # print("Current tx:")
-            # print("amount: {}".format(tx_contents["amount"]))
-
             if tx_contents["type"] == TransactionType.MESSAGE.value:
                 total_fees += len(tx_contents["message"])
             elif tx_contents["type"] == TransactionType.AMOUNT.value:
@@ -86,7 +83,6 @@ class Block():
             if tx_contents["type"] == TransactionType.STAKE.value:
                 stakes[tx_contents["sender_addr"]] = tx_contents["amount"]
 
-        # print(f"Stakes calculated from block {stakes}.")
         return stakes
 
     def validate(self, val_pubkey, prev_hash):
