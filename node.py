@@ -429,7 +429,7 @@ class Node:
                     amount = float(items[2])
                     self.create_tx(items[1], TransactionType.AMOUNT.value, amount)
                 except ValueError:
-                    self.create_tx(items[1], TransactionType.MESSAGE.value, items[2])
+                    self.create_tx(items[1], TransactionType.MESSAGE.value, " ".join(items[2:]))
                 except IndexError:
                     print("[Error] Transaction amount was not provided!")
             case "stake":

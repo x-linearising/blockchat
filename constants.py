@@ -12,7 +12,7 @@ class Constants:
     BOOTSTRAP_PRIVKEY_PATH = os.path.join(SRC_PATH, "bootstrap_keys", "id_rsa")
     BOOTSTRAP_INITIAL_STAKE = 10
 
-    MAX_NODES = 6
+    MAX_NODES = 5
     JSON_HEADER = {'Content-Type': 'application/json'}
     CAPACITY = 5
     STARTING_BCC_PER_NODE = 1000
