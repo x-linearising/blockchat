@@ -445,7 +445,52 @@ class Node:
                 self.dump_logs()
                 print("Dumped logs.")
             case  "help":
-                print("<help shown here>")
+                print("""
+    t <recipient_address> <amount>
+        New transaction: Sends the amount of BCC coins from the sender's wallet to the recipient_address wallet. 
+        
+        Example:
+        t 2 100
+        The above command creates an "amount" transaction with node 2 as the recipient. Transfers 100 BCC from 
+        the node running the command to node 2. 
+        
+    t <recipient_address> <message>
+        New transaction: Sends the message to the recipient_address, appropriately charging the sender's 
+        wallet based on the number of characters included in the message. 
+
+        Example:
+        t 0 "Lipsum" 
+        The above command creates a "message" transaction with node 0 as the recipient. The message sent is
+        "Lipsum" and charges the sender 6 BCCs (1 per character).
+        
+    stake <amount>
+        Set the node's stake: Commits an amount for staking of the particular node. Stakes are checked 
+        when a block is filled to determine the validator of the block via Proof Of Stakes algorithm. 
+        The stake remains constant for all subsequent blocks or until another stake command is executed by the node. 
+         
+        Example:
+        stake 10
+        The above commands sets the current node's stake at 10. The specified amount replaces the previous stake.
+        This stake will take effect once the stake transaction enters the blockchain.
+        
+    view
+        View last block: Prints the transactions contained in the last validated block of the BlockChat blockchain, 
+        as well as the validator's id. 
+        
+    view all
+        View blockchain: Prints the whole blockchain including the transactions of each block. 
+        
+    tx
+        View soft state transactions: Prints the soft state list of transactions received by the node 
+        but not yet placed in the blockchain.
+        
+    balance
+        Show balance: Prints the balances of the wallets (soft states and hard states).
+        
+    logs
+        Creates log files (under /logs directory) based on the current state of the blockchain. Used for debugging purposes.
+
+                """)
             case _:
                 print("Invalid Command! You can view valid commands with \'help\'")
 
